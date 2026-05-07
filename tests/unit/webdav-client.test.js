@@ -166,12 +166,12 @@ describe('buildProfile', () => {
     strictEqual(profile.hash.length, 64);
   });
 
-  it('Text (inline, long): preview truncated to ~100 chars + "..."', async () => {
+  it('Text (inline, below threshold): preserves the full text', async () => {
     const longText = 'A'.repeat(200);
     const profile = await mod.buildProfile({ type: 'Text', text: longText });
     strictEqual(profile.type, 'Text');
     strictEqual(profile.hasData, false);
-    strictEqual(profile.text, 'A'.repeat(100) + '...');
+    strictEqual(profile.text, longText);
     strictEqual(profile.size, 200);
   });
 
@@ -183,7 +183,7 @@ describe('buildProfile', () => {
     strictEqual(profile.hash, KNOWN_HASHES['']);
   });
 
-  it('Text (file-backed, large): HasData=true with file name and profile hash', async () => {
+  it('Text (file-backed, large): HasData=true with prefix text and full-text hash', async () => {
     const max = textInlineMax();
     const largeText = 'B'.repeat(max + 100);
     const profile = await mod.buildProfile({
@@ -194,10 +194,24 @@ describe('buildProfile', () => {
     strictEqual(profile.hasData, true);
     ok(profile.dataName, 'Must have DataName');
     ok(profile.dataName.endsWith('-text.txt'), 'Must end with -text.txt');
+    strictEqual(profile.text, 'B'.repeat(max));
+    ok(!profile.text.endsWith('...'), 'Large text prefix must not append ellipsis');
 
-    // Profile hash must use server rule
-    const expectedHash = await mod.computeProfileHash(profile.dataName, new Blob([largeText]));
+    // Text hash must always be the SHA256 of the full text
+    const expectedHash = await mod.computeHash(largeText);
     strictEqual(profile.hash, expectedHash);
+  });
+
+  it('Text (file-backed, large): still uses transfer data when no blob is provided', async () => {
+    const max = textInlineMax();
+    const largeText = 'C'.repeat(max + 1);
+    const profile = await mod.buildProfile({ type: 'Text', text: largeText });
+
+    strictEqual(profile.type, 'Text');
+    strictEqual(profile.hasData, true);
+    ok(profile.dataName.endsWith('-text.txt'));
+    strictEqual(profile.text, 'C'.repeat(max));
+    strictEqual(profile.hash, await mod.computeHash(largeText));
   });
 
   it('Image: produces correct ProfileDto with server hash rule', async () => {
