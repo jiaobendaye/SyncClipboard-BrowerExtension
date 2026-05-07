@@ -158,8 +158,19 @@ Body: Blob
 ```
 GET {baseUrl}/file/{encodeURIComponent(fileName)}
 ```
-- 浏览器扩展：直接 URL + Auth Header 传给 `chrome.downloads.download`
-- 普通页面：fetch → Blob → 模拟下载
+- 浏览器扩展：优先调用浏览器下载 API。
+  - Chromium：`chrome.downloads.download`
+  - Firefox：`browser.downloads.download`
+- 若浏览器拒绝原始文件名，或需要兼容本地保存名，则先 `GET` 为 `Blob`，再通过下载 API 或页面 `<a download>` 触发保存。
+- 普通页面：`fetch` → `Blob` → 模拟下载
+
+### 本地下载文件名兼容
+
+- WebDAV 协议中的 `dataName` **不会被修改**；服务端仍然使用原始文件名。
+- 浏览器下载到本地时，部分浏览器会拒绝路径片段以 `.` 开头或结尾的文件名。
+- 本扩展会在本地保存前做兼容处理：移除每个路径片段开头/结尾的不兼容点号。
+- 示例：服务端 `dataName=".last_revision"`，本地下载名可能为 `last_revision`。
+- 该兼容只影响本地落盘文件名，不影响 profile、hash 或 WebDAV 路径。
 
 ## 认证
 
@@ -168,7 +179,7 @@ HTTP Basic Auth：
 Authorization: Basic base64(username + ":" + password)
 ```
 
-无用户名密码时不发送 Authorization 头。
+无用户名密码时不发送 Authorization 头。Blob 回退下载路径仍然通过同样的 Basic Auth 请求获取文件内容。
 
 ## 文件名生成规则
 
