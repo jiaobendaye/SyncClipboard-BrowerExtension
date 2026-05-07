@@ -13,14 +13,30 @@
  */
 
 import { deepStrictEqual, strictEqual, ok } from 'node:assert';
-import { describe, it, before } from 'node:test';
+import { describe, it, before, afterEach } from 'node:test';
 import { createHash } from 'node:crypto';
 
 // Dynamic import since webdav-client uses ES module browser APIs
 let mod;
+const originalBrowser = globalThis.browser;
+const originalChrome = globalThis.chrome;
 
 before(async () => {
   mod = await import('../../extension/webdav-client.js');
+});
+
+afterEach(() => {
+  if (originalBrowser === undefined) {
+    delete globalThis.browser;
+  } else {
+    globalThis.browser = originalBrowser;
+  }
+
+  if (originalChrome === undefined) {
+    delete globalThis.chrome;
+  } else {
+    globalThis.chrome = originalChrome;
+  }
 });
 
 // ============================================================
@@ -332,5 +348,49 @@ describe('Wire format compatibility', () => {
     const requiredFields = ['Type', 'Hash', 'Text', 'HasData', 'DataName', 'Size'];
     // Verify the C# record matches — we only produce these fields
     strictEqual(requiredFields.length, 6, 'C# ProfileDto has 6 fields');
+  });
+});
+
+describe('downloads API compatibility', () => {
+  it('uses browser.downloads.download when browser namespace is available', async () => {
+    let receivedOptions = null;
+    globalThis.browser = {
+      downloads: {
+        download: async (options) => {
+          receivedOptions = options;
+          return 'firefox-download-id';
+        }
+      }
+    };
+    delete globalThis.chrome;
+
+    const downloadId = await mod.downloadFile('https://webdav.example.com', '', '', '.last_revision');
+
+    strictEqual(downloadId, 'firefox-download-id');
+    strictEqual(receivedOptions.url, 'https://webdav.example.com/file/.last_revision');
+    strictEqual(receivedOptions.filename, '.last_revision');
+    deepStrictEqual(receivedOptions.headers, []);
+    strictEqual(receivedOptions.saveAs, false);
+  });
+
+  it('falls back to chrome.downloads.download callback mode', async () => {
+    let receivedOptions = null;
+    delete globalThis.browser;
+    globalThis.chrome = {
+      runtime: {},
+      downloads: {
+        download: (options, callback) => {
+          receivedOptions = options;
+          callback(42);
+        }
+      }
+    };
+
+    const downloadId = await mod.downloadBlob('saved.txt', new Blob(['saved']));
+
+    strictEqual(downloadId, 42);
+    strictEqual(receivedOptions.filename, 'saved.txt');
+    ok(receivedOptions.url.startsWith('blob:'), 'downloadBlob must use an object URL');
+    strictEqual(receivedOptions.saveAs, false);
   });
 });

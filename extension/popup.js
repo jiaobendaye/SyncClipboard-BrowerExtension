@@ -1,7 +1,7 @@
 import { browserApi } from './browser-api.js';
 import { createChromeStorage } from './storage.js';
 import { createMockStorage } from './storage-mock.js';
-import { testConnection, getProfile, putProfile, putFileData, getFileData, buildProfile, computeHash, createTextTransferBlob, downloadFile } from './webdav-client.js';
+import { testConnection, getProfile, putProfile, putFileData, getFileData, buildProfile, computeHash, createTextTransferBlob, downloadFile, downloadBlob } from './webdav-client.js';
 
 const storage = browserApi.available
   ? createChromeStorage()
@@ -144,6 +144,62 @@ function getUploadBlob(content, profile) {
   if (content.blob) return content.blob;
   if (content.type === 'Text') return createTextTransferBlob(content.text || '');
   return null;
+}
+
+function saveBlobLocally(fileName, blob) {
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = fileName;
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+}
+
+function isInvalidDownloadFilenameError(err) {
+  return typeof err?.message === 'string' && /invalid filename/i.test(err.message);
+}
+
+function sanitizeDownloadPathComponent(component, fallbackName) {
+  const sanitized = component.replace(/^\.+/, '').replace(/\.+$/, '');
+  return sanitized || fallbackName;
+}
+
+function getCompatibleDownloadFileName(fileName) {
+  const path = String(fileName || '');
+  const components = path.split('/');
+  return components.map((component, index) => {
+    const fallbackName = index === components.length - 1 ? 'download' : 'folder';
+    return sanitizeDownloadPathComponent(component, fallbackName);
+  }).join('/');
+}
+
+async function downloadProfileData(settings, password, fileName) {
+  const downloadFileName = getCompatibleDownloadFileName(fileName);
+  const needsCompatibleName = downloadFileName !== fileName;
+
+  if (browserApi.canDownload && !needsCompatibleName) {
+    try {
+      await downloadFile(settings.webdav.url, settings.webdav.username, password, downloadFileName);
+      return downloadFileName;
+    } catch (err) {
+      if (!isInvalidDownloadFilenameError(err)) throw err;
+    }
+  }
+
+  const blob = await getFileData(settings.webdav.url, settings.webdav.username, password, fileName);
+  if (browserApi.canDownload) {
+    try {
+      await downloadBlob(downloadFileName, blob);
+      return downloadFileName;
+    } catch {
+      // Fall back to DOM-triggered download below.
+    }
+  }
+  saveBlobLocally(downloadFileName, blob);
+  return downloadFileName;
 }
 
 function setButtons(enabled) {
@@ -364,9 +420,7 @@ els.downloadBtn.addEventListener('click', async () => {
       await loadHistory();
       showBanner('Copied to clipboard', 'success');
     } else {
-      if (browserApi.downloads) {
-        await downloadFile(settings.webdav.url, settings.webdav.username, password, profile.dataName);
-      }
+      const savedFileName = await downloadProfileData(settings, password, profile.dataName);
 
       await storage.addHistory({
         type: profile.type,
@@ -376,7 +430,10 @@ els.downloadBtn.addEventListener('click', async () => {
         timestamp: Date.now()
       });
       await loadHistory();
-      showBanner('Downloaded: ' + profile.dataName, 'success');
+      const bannerMessage = savedFileName === profile.dataName
+        ? 'Downloaded: ' + savedFileName
+        : 'Downloaded as: ' + savedFileName;
+      showBanner(bannerMessage, 'success');
     }
   } catch (err) {
     if (err.message && err.message.includes('404')) {

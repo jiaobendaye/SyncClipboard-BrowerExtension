@@ -14,7 +14,7 @@ const TEXT_INLINE_MAX_BYTES = 1024;
 async function grantClipboard(context) {
   const browserName = context.browser().browserType().name();
   if (browserName === 'firefox') return;
-  await grantClipboard(context);
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
 }
 
 /**
@@ -173,7 +173,7 @@ test.describe('Popup', () => {
   });
 
   test('Upload medium text keeps full text in profile', async ({ page, context }) => {
-    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await grantClipboard(context);
 
     const mediumText = 'M'.repeat(200);
     let capturedProfile = null;
@@ -213,7 +213,7 @@ test.describe('Popup', () => {
   });
 
   test('Upload oversized text stores transfer file and preserves full text', async ({ page, context }) => {
-    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await grantClipboard(context);
 
     const longText = 'L'.repeat(TEXT_INLINE_MAX_BYTES + 200);
     let capturedProfile = null;
@@ -283,7 +283,7 @@ test.describe('Popup', () => {
   });
 
   test('Download oversized text restores full clipboard text', async ({ page, context }) => {
-    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await grantClipboard(context);
 
     const longText = 'D'.repeat(TEXT_INLINE_MAX_BYTES + 250);
     const previewText = longText.slice(0, TEXT_INLINE_MAX_BYTES);
@@ -356,6 +356,83 @@ test.describe('Popup', () => {
     await page.click('#download-btn');
     // In non-extension context, file downloads via temporary anchor element
     await expect(page.locator('.success-banner')).toBeVisible();
+  });
+
+  test('Download hidden filename falls back when browser rejects it', async ({ page }) => {
+    const fileName = '.last_revision';
+    const savedFileName = 'last_revision';
+    const fileBody = 'rev=20260507';
+    const fileSize = Buffer.byteLength(fileBody);
+
+    await page.goto(POPUP);
+    await mockWebdav(page, [
+      ...BASE_HANDLERS,
+      {
+        method: 'GET', path: '/SyncClipboard.json',
+        body: { type: 'File', hash: 'def456', text: fileName, hasData: true, dataName: fileName, size: fileSize },
+      },
+      {
+        method: 'GET', path: '/file/' + fileName,
+        status: 200, contentType: 'application/octet-stream', body: fileBody,
+      },
+    ]);
+
+    await seedSettings(page);
+    await page.reload();
+    await mockWebdav(page, [
+      ...BASE_HANDLERS,
+      {
+        method: 'GET', path: '/SyncClipboard.json',
+        body: { type: 'File', hash: 'def456', text: fileName, hasData: true, dataName: fileName, size: fileSize },
+      },
+      {
+        method: 'GET', path: '/file/' + fileName,
+        status: 200, contentType: 'application/octet-stream', body: fileBody,
+      },
+    ]);
+
+    await page.evaluate(() => {
+      window.__downloads = [];
+      const originalCreateElement = document.createElement.bind(document);
+      document.createElement = (tagName, options) => {
+        const element = originalCreateElement(tagName, options);
+        if (String(tagName).toLowerCase() === 'a') {
+          element.click = () => {
+            window.__downloads.push({ fileName: element.download, href: element.href });
+          };
+        }
+        return element;
+      };
+
+      URL.createObjectURL = (blob) => {
+        window.__downloadBlobSize = blob.size;
+        return 'blob:syncclipboard-test';
+      };
+      URL.revokeObjectURL = () => {};
+
+      window.chrome = {
+        runtime: {},
+        downloads: {
+          download: (_options, callback) => {
+            window.chrome.runtime.lastError = { message: 'Invalid filename' };
+            callback();
+            delete window.chrome.runtime.lastError;
+          }
+        }
+      };
+    });
+
+    await page.click('#download-btn');
+    await expect(page.locator('.success-banner')).toContainText('Downloaded as: ' + savedFileName);
+
+    const downloadState = await page.evaluate(() => ({
+      downloads: window.__downloads,
+      blobSize: window.__downloadBlobSize,
+    }));
+    expect(downloadState.downloads).toHaveLength(1);
+    expect(downloadState.downloads[0].fileName).toBe(savedFileName);
+    expect(downloadState.downloads[0].href).toBe('blob:syncclipboard-test');
+    expect(downloadState.blobSize).toBe(fileSize);
   });
 
   test('7. File size limit displayed', async ({ page }) => {

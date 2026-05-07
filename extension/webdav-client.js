@@ -2,6 +2,8 @@
 // Implements the Reference SyncClipboard.json protocol for cross-device compatibility.
 // Zero dependencies — uses only fetch() and Web Crypto API.
 
+import { browserApi } from './browser-api.js';
+
 const PROFILE_PATH = '/SyncClipboard.json';
 const FILE_DIR = '/file';
 const TIMEOUT_MS = 30000;
@@ -262,13 +264,13 @@ function generateFileName(type, blob) {
 }
 
 /**
- * Download a file from the server and save via chrome.downloads.
- * Uses direct URL with auth headers so chrome.downloads respects the filename.
+ * Download a file from the server via the browser downloads API.
+ * Uses direct URL with auth headers so the browser handles the save flow.
  * @param {string} baseUrl
  * @param {string} username
  * @param {string} password
  * @param {string} fileName
- * @returns {Promise<number>} downloadId
+ * @returns {Promise<number|string>} downloadId
  */
 export async function downloadFile(baseUrl, username, password, fileName) {
   const url = stripTrailingSlash(baseUrl) + `${FILE_DIR}/${encodeURIComponent(fileName)}`;
@@ -276,15 +278,24 @@ export async function downloadFile(baseUrl, username, password, fileName) {
   if (username || password) {
     headers.push({ name: 'Authorization', value: 'Basic ' + base64Encode(username + ':' + password) });
   }
-  return new Promise((resolve, reject) => {
-    chrome.downloads.download({ url, filename: fileName, headers, saveAs: false }, (downloadId) => {
-      if (chrome.runtime.lastError) {
-        reject(new Error(chrome.runtime.lastError.message));
-        return;
-      }
-      resolve(downloadId);
-    });
-  });
+  return browserApi.download({ url, filename: fileName, headers, saveAs: false });
+}
+
+/**
+ * Save an in-memory blob through the browser downloads API.
+ * Useful when the direct download filename is browser-incompatible.
+ * @param {string} fileName
+ * @param {Blob} blob
+ * @returns {Promise<number|string>} downloadId
+ */
+export async function downloadBlob(fileName, blob) {
+  const url = URL.createObjectURL(blob);
+  try {
+    return await browserApi.download({ url, filename: fileName, saveAs: false });
+  } finally {
+    const revokeTimer = setTimeout(() => URL.revokeObjectURL(url), 60000);
+    revokeTimer.unref?.();
+  }
 }
 
 export { TEXT_INLINE_MAX_BYTES };
