@@ -1,0 +1,7 @@
+Reference/
+.gstack/
+node_modules/
+test-results/
+.playwright-mcp/
+.env
+.claude/

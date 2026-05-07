@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "SyncClipboard",
+  "version": "1.0.0",
+  "description": "Manual push-to-share clipboard via WebDAV. Compatible with SyncClipboard desktop and Android clients.",
+  "minimum_chrome_version": "102",
+  "permissions": [
+    "storage",
+    "clipboardRead",
+    "clipboardWrite",
+    "downloads"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "SyncClipboard"
+  },
+  "options_page": "options.html"
+}

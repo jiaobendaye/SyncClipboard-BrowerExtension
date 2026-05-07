@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SyncClipboard</title>
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<div id="app">
+  <header id="status-bar">
+    <span id="status-dot" class="dot disconnected"></span>
+    <span id="status-text">No server configured — click to set up</span>
+  </header>
+
+  <section id="local-section">
+    <div class="section-header-row">
+      <span class="section-header">Local</span>
+      <div class="local-actions">
+        <button id="choose-file-btn" class="btn secondary small">Choose File</button>
+        <button id="read-clipboard-btn" class="btn primary small">Read Clipboard</button>
+      </div>
+    </div>
+    <input type="file" id="file-input" hidden>
+    <div id="clipboard-preview" class="preview-box empty">
+      <span id="preview-text">No content read yet</span>
+      <img id="preview-image" style="display:none" alt="Clipboard preview">
+    </div>
+  </section>
+
+  <section id="actions">
+    <button id="upload-btn" class="btn primary" disabled>Upload to Server</button>
+    <button id="download-btn" class="btn primary">Download from Server</button>
+  </section>
+
+  <section id="history-section">
+    <div class="section-header" id="history-header">Recent</div>
+    <ul id="history-list"></ul>
+    <button id="clear-history-btn" class="btn danger" disabled>Clear Recent</button>
+  </section>
+
+  <footer id="footer">
+    <span id="max-size-display">Max upload: 50MB</span>
+    <a id="change-link" href="options.html" target="_blank">change</a>
+  </footer>
+</div>
+
+<div id="confirm-dialog" class="dialog-overlay" style="display:none">
+  <div class="dialog-box">
+    <p>Clear all recent history?</p>
+    <div class="dialog-actions">
+      <button id="confirm-yes" class="btn danger">Clear</button>
+      <button id="confirm-no" class="btn secondary">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="popup.js"></script>
+</body>
+</html>

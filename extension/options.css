@@ -1,0 +1,122 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  color: #1a1a1a;
+  background: #f8f9fa;
+  display: flex;
+  justify-content: center;
+  padding: 40px 16px;
+}
+
+#app {
+  max-width: 520px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+h1 {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+h2 {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #888;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+section {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #555;
+}
+
+.field input, .field select {
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #fff;
+}
+
+.field input:focus, .field select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37,99,235,0.15);
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn.primary {
+  background: #2563eb;
+  color: #fff;
+}
+
+.btn.primary:hover { background: #1d4ed8; }
+
+.btn.secondary {
+  background: #e5e7eb;
+  color: #333;
+}
+
+.btn.secondary:hover { background: #d1d5db; }
+
+#test-result, #save-result {
+  font-size: 13px;
+}
+
+#test-result.success, #save-result.success { color: #16a34a; }
+
+#test-result.error, #save-result.error { color: #dc2626; }
+
+.field-error {
+  font-size: 12px;
+  color: #dc2626;
+  margin-top: 2px;
+}
+
+#test-result.testing { color: #888; }
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
