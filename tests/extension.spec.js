@@ -4,6 +4,7 @@ const POPUP = '/extension/popup.html';
 const STANDALONE_POPUP = '/extension/popup.html?mode=standalone';
 const OPTIONS = '/extension/options.html';
 const WEBDAV_HOST = 'https://webdav.example.com';
+const TEXT_INLINE_MAX_BYTES = 1024;
 
 /**
  * Install mock WebDAV routes on the page.
@@ -159,6 +160,91 @@ test.describe('Popup', () => {
     expect(capturedProfile.hasData).toBe(false);
   });
 
+  test('Upload medium text keeps full text in profile', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+
+    const mediumText = 'M'.repeat(200);
+    let capturedProfile = null;
+    let uploadedFile = false;
+
+    await page.goto(POPUP);
+    await seedSettings(page);
+    await mockWebdav(page, BASE_HANDLERS);
+
+    await page.route('**/webdav.example.com/file/**', (route) => {
+      uploadedFile = true;
+      route.fulfill({ status: 200 });
+    });
+
+    await page.route('**/webdav.example.com/SyncClipboard.json', (route) => {
+      if (route.request().method() === 'PUT') {
+        capturedProfile = JSON.parse(route.request().postData());
+      }
+      route.fulfill({ status: 200 });
+    });
+
+    await page.reload();
+
+    await page.evaluate(async (text) => {
+      await navigator.clipboard.writeText(text);
+    }, mediumText);
+
+    await page.click('#read-clipboard-btn');
+    await page.click('#upload-btn');
+
+    await expect(page.locator('.success-banner')).toBeVisible();
+    expect(uploadedFile).toBe(false);
+    expect(capturedProfile).toBeTruthy();
+    expect(capturedProfile.type).toBe('Text');
+    expect(capturedProfile.hasData).toBe(false);
+    expect(capturedProfile.text).toBe(mediumText);
+  });
+
+  test('Upload oversized text stores transfer file and preserves full text', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+
+    const longText = 'L'.repeat(TEXT_INLINE_MAX_BYTES + 200);
+    let capturedProfile = null;
+    let uploadedFileBody = null;
+    let uploadedFilePath = null;
+
+    await page.goto(POPUP);
+    await seedSettings(page);
+    await mockWebdav(page, BASE_HANDLERS);
+
+    await page.route('**/webdav.example.com/file/**', (route) => {
+      uploadedFilePath = new URL(route.request().url()).pathname;
+      uploadedFileBody = route.request().postDataBuffer()?.toString('utf8') || null;
+      route.fulfill({ status: 200 });
+    });
+
+    await page.route('**/webdav.example.com/SyncClipboard.json', (route) => {
+      if (route.request().method() === 'PUT') {
+        capturedProfile = JSON.parse(route.request().postData());
+      }
+      route.fulfill({ status: 200 });
+    });
+
+    await page.reload();
+
+    await page.evaluate(async (text) => {
+      await navigator.clipboard.writeText(text);
+    }, longText);
+
+    await page.click('#read-clipboard-btn');
+    await page.click('#upload-btn');
+
+    await expect(page.locator('.success-banner')).toBeVisible();
+    expect(capturedProfile).toBeTruthy();
+    expect(capturedProfile.type).toBe('Text');
+    expect(capturedProfile.hasData).toBe(true);
+    expect(capturedProfile.dataName).toMatch(/-text\.txt$/);
+    expect(capturedProfile.text).toBe(longText.slice(0, TEXT_INLINE_MAX_BYTES));
+    expect(capturedProfile.text.endsWith('...')).toBe(false);
+    expect(uploadedFilePath).toBe('/file/' + capturedProfile.dataName);
+    expect(uploadedFileBody).toBe(longText);
+  });
+
   test('5. Download text from server', async ({ page }) => {
     await page.goto(POPUP);
     await mockWebdav(page, [
@@ -182,6 +268,48 @@ test.describe('Popup', () => {
     await page.click('#download-btn');
     await expect(page.locator('#preview-text')).toContainText('downloaded text');
     await expect(page.locator('.success-banner')).toBeVisible();
+  });
+
+  test('Download oversized text restores full clipboard text', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+
+    const longText = 'D'.repeat(TEXT_INLINE_MAX_BYTES + 250);
+    const previewText = longText.slice(0, TEXT_INLINE_MAX_BYTES);
+    const dataName = 'syncclipboard-20260507T113000Z-text.txt';
+
+    await page.goto(POPUP);
+    await mockWebdav(page, [
+      ...BASE_HANDLERS,
+      {
+        method: 'GET', path: '/SyncClipboard.json',
+        body: { type: 'Text', hash: 'abc123', text: previewText, hasData: true, dataName, size: longText.length },
+      },
+      {
+        method: 'GET', path: '/file/' + dataName,
+        status: 200, contentType: 'text/plain; charset=utf-8', body: longText,
+      },
+    ]);
+
+    await seedSettings(page);
+    await page.reload();
+    await mockWebdav(page, [
+      ...BASE_HANDLERS,
+      {
+        method: 'GET', path: '/SyncClipboard.json',
+        body: { type: 'Text', hash: 'abc123', text: previewText, hasData: true, dataName, size: longText.length },
+      },
+      {
+        method: 'GET', path: '/file/' + dataName,
+        status: 200, contentType: 'text/plain; charset=utf-8', body: longText,
+      },
+    ]);
+
+    await page.click('#download-btn');
+    await expect(page.locator('#preview-text')).toContainText(longText.slice(0, 200));
+    await expect(page.locator('.success-banner')).toBeVisible();
+
+    const clipboardText = await page.evaluate(async () => navigator.clipboard.readText());
+    expect(clipboardText).toBe(longText);
   });
 
   test('6. Download file from server', async ({ page }) => {

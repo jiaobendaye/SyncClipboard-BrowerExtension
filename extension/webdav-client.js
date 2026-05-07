@@ -6,12 +6,13 @@ const PROFILE_PATH = '/SyncClipboard.json';
 const FILE_DIR = '/file';
 const TIMEOUT_MS = 30000;
 const TEXT_INLINE_MAX_BYTES = 1024;
+const textEncoder = new TextEncoder();
 
 /**
  * @typedef {Object} ProfileDto
  * @property {string} type - "Text" | "Image" | "File" | "Group"
  * @property {string} hash - SHA-256 hex (uppercase)
- * @property {string} text - preview text or filename
+ * @property {string} text - full text, text prefix, or filename
  * @property {boolean} hasData
  * @property {string} [dataName]
  * @property {number} size
@@ -166,6 +167,28 @@ export async function computeHash(data) {
   return hashArray.map(b => b.toString(16).padStart(2, '0').toUpperCase()).join('');
 }
 
+function getUtf8ByteLength(text) {
+  return textEncoder.encode(text).byteLength;
+}
+
+function truncateTextToUtf8Bytes(text, maxBytes) {
+  if (getUtf8ByteLength(text) <= maxBytes) return text;
+
+  let result = '';
+  let usedBytes = 0;
+  for (const char of text) {
+    const charBytes = getUtf8ByteLength(char);
+    if (usedBytes + charBytes > maxBytes) break;
+    result += char;
+    usedBytes += charBytes;
+  }
+  return result;
+}
+
+export function createTextTransferBlob(text) {
+  return new Blob([text], { type: 'text/plain;charset=utf-8' });
+}
+
 /**
  * Compute the profile hash for file-backed content.
  * Matches Reference server rule (calculateFileProfileHash in mobile):
@@ -188,28 +211,36 @@ export async function computeProfileHash(fileName, contentBlob) {
 export async function buildProfile(content) {
   const { type, text = '', blob, fileName, fileSize } = content;
 
-  if (type === 'Text' && (!blob || (text.length < TEXT_INLINE_MAX_BYTES && !fileName))) {
-    const shortText = text.length > 100 ? text.slice(0, 100) + '...' : text;
-    const result = {
+  if (type === 'Text') {
+    const shouldInlineText = !blob && !fileName && getUtf8ByteLength(text) < TEXT_INLINE_MAX_BYTES;
+    if (shouldInlineText) {
+      return {
+        type: 'Text',
+        hash: await computeHash(text),
+        text,
+        hasData: false,
+        size: text.length
+      };
+    }
+
+    return {
       type: 'Text',
       hash: await computeHash(text),
-      text: shortText,
-      hasData: false,
+      text: truncateTextToUtf8Bytes(text, TEXT_INLINE_MAX_BYTES),
+      hasData: true,
+      dataName: fileName || generateFileName(type, blob),
       size: text.length
     };
-    return result;
   }
 
   const dataName = fileName || generateFileName(type, blob);
   const size = fileSize || (blob ? blob.size : text.length);
-  const displayText = type === 'Text' ? (text.length > 100 ? text.slice(0, 100) + '...' : text) : dataName;
-
   const hash = blob ? await computeProfileHash(dataName, blob) : await computeHash(text);
 
   return {
     type,
     hash,
-    text: displayText,
+    text: dataName,
     hasData: true,
     dataName,
     size

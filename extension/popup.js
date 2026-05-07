@@ -1,6 +1,6 @@
 import { createChromeStorage } from './storage.js';
 import { createMockStorage } from './storage-mock.js';
-import { testConnection, getProfile, putProfile, putFileData, getFileData, buildProfile, computeHash, downloadFile } from './webdav-client.js';
+import { testConnection, getProfile, putProfile, putFileData, getFileData, buildProfile, createTextTransferBlob, downloadFile } from './webdav-client.js';
 
 const storage = (typeof chrome !== 'undefined' && chrome.storage)
   ? createChromeStorage()
@@ -80,6 +80,11 @@ function resetPreview() {
   els.previewBox.classList.add('empty');
 }
 
+function getTextPreview(text, maxChars = 200) {
+  if (text.length <= maxChars) return text;
+  return text.slice(0, maxChars) + '...';
+}
+
 function hasExtensionRuntime() {
   return typeof chrome !== 'undefined' && typeof chrome.runtime?.getURL === 'function';
 }
@@ -131,6 +136,13 @@ function handleSelectedFile(file) {
   }
   clipboardContent = { type: isImage ? 'Image' : 'File', blob: file, fileName: file.name, fileSize: file.size };
   els.uploadBtn.disabled = false;
+}
+
+function getUploadBlob(content, profile) {
+  if (!profile.hasData) return null;
+  if (content.blob) return content.blob;
+  if (content.type === 'Text') return createTextTransferBlob(content.text || '');
+  return null;
 }
 
 function setButtons(enabled) {
@@ -246,7 +258,7 @@ els.readBtn.addEventListener('click', async () => {
         showBanner('No content in clipboard', 'error');
         return;
       }
-      setPreviewText(text.length > 200 ? text.slice(0, 200) + '...' : text);
+      setPreviewText(getTextPreview(text));
       clipboardContent = { type: 'Text', text, blob: null };
       els.uploadBtn.disabled = false;
     }
@@ -273,18 +285,21 @@ els.uploadBtn.addEventListener('click', async () => {
     els.uploadBtn.textContent = 'Uploading...';
 
     const content = clipboardContent;
-    if (content.blob && content.blob.size > settings.maxFileSize) {
+    const password = await storage.getPassword();
+    const profile = await buildProfile(content);
+    const uploadBlob = getUploadBlob(content, profile);
+
+    if (uploadBlob && uploadBlob.size > settings.maxFileSize) {
       showBanner('File exceeds maximum upload size (' + formatSize(settings.maxFileSize) + ')', 'error');
       return;
     }
 
-    const password = await storage.getPassword();
-    const profile = await buildProfile(content);
-    const hasData = profile.hasData;
-
-    if (hasData && content.blob) {
+    if (profile.hasData) {
+      if (!uploadBlob) {
+        throw new Error('Missing transfer data for upload');
+      }
       const fileName = profile.dataName;
-      await putFileData(settings.webdav.url, settings.webdav.username, password, fileName, content.blob);
+      await putFileData(settings.webdav.url, settings.webdav.username, password, fileName, uploadBlob);
     }
 
     await putProfile(settings.webdav.url, settings.webdav.username, password, profile);
@@ -321,9 +336,14 @@ els.downloadBtn.addEventListener('click', async () => {
     const password = await storage.getPassword();
     const profile = await getProfile(settings.webdav.url, settings.webdav.username, password);
 
-    if (!profile.hasData) {
-      const text = profile.text || '';
-      setPreviewText(text || '(empty)');
+    if (profile.type === 'Text') {
+      let text = profile.text || '';
+      if (profile.hasData) {
+        const blob = await getFileData(settings.webdav.url, settings.webdav.username, password, profile.dataName);
+        text = await blob.text();
+      }
+
+      setPreviewText(getTextPreview(text || '(empty)'));
       clipboardContent = { type: 'Text', text, blob: null };
       els.uploadBtn.disabled = false;
 
@@ -335,8 +355,8 @@ els.downloadBtn.addEventListener('click', async () => {
 
       await storage.addHistory({
         type: 'Text',
-        text,
-        fileName: null,
+        text: profile.hasData ? profile.text : text,
+        fileName: profile.hasData ? profile.dataName : null,
         size: profile.size,
         timestamp: Date.now()
       });

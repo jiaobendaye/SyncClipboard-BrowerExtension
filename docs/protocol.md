@@ -25,10 +25,10 @@
 {
   "type": "Text",           // "Text" | "Image" | "File" | "Group"
   "hash": "B780770E...",    // SHA-256 大写十六进制，64 字符
-  "text": "早市的烧白也在这", // 预览文本（内联文本=内容；文件=文件名）
+  "text": "早市的烧白也在这", // Text: 完整内容或前缀；文件: 文件名
   "hasData": false,          // true 时 dataName 必须存在
   "dataName": null,          // hasData=false 时不出现此字段
-  "size": 8                  // 内容字节数
+  "size": 8                  // Text 为完整字符串长度；文件为字节数
 }
 ```
 
@@ -37,11 +37,11 @@
 | 字段 | 类型 | 内联文本 | 文件型 | 说明 |
 |------|------|---------|--------|------|
 | `type` | string | `"Text"` | `"Image"` / `"File"` | 内容类型 |
-| `hash` | string | `SHA256(text)` | `SHA256(fileName + "|" + SHA256(blob))` | 64 位大写十六进制 |
-| `text` | string | 内容本身（≤100 字符） | 文件名 | 预览/展示用，无前缀 |
+| `hash` | string | `SHA256(text)` | Text 长文本仍为 `SHA256(fullText)`；Image/File 为 `SHA256(fileName + "|" + SHA256(blob))` | 64 位大写十六进制 |
+| `text` | string | 内容本身 | Text 长文本为完整内容前缀；Image/File 为文件名 | 预览/展示用，无前缀 |
 | `hasData` | boolean | `false` | `true` | 标记是否有文件数据 |
 | `dataName` | string? | 不出现 | 文件名 | `hasData=true` 时必填 |
-| `size` | number | `text.length` | 文件字节数 | 内容长度 |
+| `size` | number | `text.length` | Text 长文本为完整字符串长度；文件为字节数 | 内容长度 |
 
 ### 内联文本示例
 
@@ -55,8 +55,24 @@
 }
 ```
 
-- `text` 预览截断：内容超过 100 字符时取前 100 字符 + `"..."`。
 - `dataName` 字段 **不出现**（不是 `null`）。
+
+### 长文本示例（Text + hasData=true）
+
+```json
+{
+  "type": "Text",
+  "hash": "B780770E65416A4E8DBCD4CCDD86BBBF1322F682256C4CCF443F0AB0FF5AE770",
+  "text": "这是一段超长文本的开头……",
+  "hasData": true,
+  "dataName": "syncclipboard-20260507T113000Z-text.txt",
+  "size": 4096
+}
+```
+
+- `text` 保存完整文本的前缀，不追加 `"..."`。
+- `dataName` 指向 UTF-8 编码的完整文本文件。
+- `hash` 仍然是**完整文本内容**的 SHA-256，而不是文件型的 `fileName|contentHash` 规则。
 
 ### 文件型示例（图片/文件）
 
