@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 const POPUP = '/extension/popup.html';
+const STANDALONE_POPUP = '/extension/popup.html?mode=standalone';
 const OPTIONS = '/extension/options.html';
 const WEBDAV_HOST = 'https://webdav.example.com';
 
@@ -238,6 +239,86 @@ test.describe('Popup', () => {
 
     await page.click('#read-clipboard-btn');
     await expect(page.locator('.error-banner')).toBeVisible();
+  });
+
+  test('Choose File hands off to standalone page in extension popup context', async ({ page }) => {
+    await page.goto(POPUP);
+
+    await page.evaluate(() => {
+      window.__openedWindows = [];
+      window.__closedPopup = false;
+      window.chrome = {
+        runtime: {
+          getURL: (path) => new URL(path, `${window.location.origin}/extension/`).toString()
+        }
+      };
+      window.open = (url, target, features) => {
+        window.__openedWindows.push({ url, target, features });
+        return { focus() {} };
+      };
+      window.close = () => {
+        window.__closedPopup = true;
+      };
+    });
+
+    await page.click('#choose-file-btn');
+
+    const state = await page.evaluate(() => ({
+      openedWindows: window.__openedWindows,
+      closedPopup: window.__closedPopup
+    }));
+
+    expect(state.openedWindows).toHaveLength(1);
+    expect(state.openedWindows[0].url).toContain('/extension/popup.html?mode=standalone&pick=file');
+    expect(state.openedWindows[0].features).toContain('popup=yes');
+    expect(state.closedPopup).toBe(true);
+  });
+
+  test('Standalone page uploads selected file', async ({ page }) => {
+    let capturedProfile = null;
+    let uploadedPath = null;
+    let uploadedBytes = 0;
+
+    await page.goto(POPUP);
+    await seedSettings(page);
+    await mockWebdav(page, BASE_HANDLERS);
+
+    await page.route('**/webdav.example.com/file/**', (route) => {
+      if (route.request().method() !== 'PUT') {
+        return route.fulfill({ status: 404, contentType: 'text/plain', body: 'Not Found' });
+      }
+      uploadedPath = new URL(route.request().url()).pathname;
+      uploadedBytes = route.request().postDataBuffer()?.length || 0;
+      return route.fulfill({ status: 200 });
+    });
+
+    await page.route('**/webdav.example.com/SyncClipboard.json', (route) => {
+      if (route.request().method() === 'PUT') {
+        capturedProfile = JSON.parse(route.request().postData());
+      }
+      return route.fulfill({ status: 200 });
+    });
+
+    await page.goto(STANDALONE_POPUP);
+
+    await page.locator('#file-input').setInputFiles({
+      name: 'picked.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('picked file contents')
+    });
+
+    await expect(page.locator('#preview-text')).toContainText('picked.txt');
+    await expect(page.locator('#upload-btn')).toBeEnabled();
+
+    await page.click('#upload-btn');
+
+    await expect(page.locator('.success-banner')).toBeVisible();
+    expect(capturedProfile).toBeTruthy();
+    expect(capturedProfile.type).toBe('File');
+    expect(capturedProfile.hasData).toBe(true);
+    expect(capturedProfile.dataName).toBe('picked.txt');
+    expect(uploadedPath).toBe('/file/picked.txt');
+    expect(uploadedBytes).toBe(Buffer.byteLength('picked file contents'));
   });
 
   test('History list shows after upload', async ({ page, context }) => {

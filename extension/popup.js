@@ -28,6 +28,9 @@ const els = {
 };
 
 let clipboardContent = null;
+const viewParams = new URLSearchParams(window.location.search);
+const isStandaloneView = viewParams.get('mode') === 'standalone';
+const shouldAutoPickFile = viewParams.get('pick') === 'file';
 
 function formatSize(bytes) {
   if (!bytes || bytes === 0) return '0 B';
@@ -75,6 +78,59 @@ function resetPreview() {
   els.previewImage.style.display = 'none';
   els.previewText.style.display = '';
   els.previewBox.classList.add('empty');
+}
+
+function hasExtensionRuntime() {
+  return typeof chrome !== 'undefined' && typeof chrome.runtime?.getURL === 'function';
+}
+
+function buildStandalonePopupUrl() {
+  const url = hasExtensionRuntime()
+    ? new URL(chrome.runtime.getURL('popup.html'))
+    : new URL(window.location.pathname, window.location.origin);
+  url.searchParams.set('mode', 'standalone');
+  url.searchParams.set('pick', 'file');
+  return url.toString();
+}
+
+function openNativeFilePicker(bestEffort = false) {
+  try {
+    if (typeof els.fileInput.showPicker === 'function') {
+      els.fileInput.showPicker();
+    } else {
+      els.fileInput.click();
+    }
+    return true;
+  } catch {
+    if (!bestEffort) {
+      showBanner('Click Choose File again to open the file picker', 'error');
+    }
+    return false;
+  }
+}
+
+function openStandaloneFilePicker() {
+  const pickerWindow = window.open(
+    buildStandalonePopupUrl(),
+    '_blank',
+    'popup=yes,width=440,height=760'
+  );
+  if (!pickerWindow) return false;
+  if (typeof pickerWindow.focus === 'function') pickerWindow.focus();
+  // Close the action popup after handing off to a regular extension page.
+  window.close();
+  return true;
+}
+
+function handleSelectedFile(file) {
+  const isImage = file.type.startsWith('image/');
+  setPreviewText(`${file.name} (${formatSize(file.size)})`);
+  if (isImage) {
+    const url = URL.createObjectURL(file);
+    setPreviewImage(url);
+  }
+  clipboardContent = { type: isImage ? 'Image' : 'File', blob: file, fileName: file.name, fileSize: file.size };
+  els.uploadBtn.disabled = false;
 }
 
 function setButtons(enabled) {
@@ -148,20 +204,14 @@ async function reDownload(item) {
 }
 
 els.chooseFileBtn.addEventListener('click', () => {
-  els.fileInput.click();
+  if (hasExtensionRuntime() && !isStandaloneView && openStandaloneFilePicker()) return;
+  openNativeFilePicker();
 });
 
 els.fileInput.addEventListener('change', () => {
   const file = els.fileInput.files[0];
   if (!file) return;
-  const isImage = file.type.startsWith('image/');
-  setPreviewText(`${file.name} (${formatSize(file.size)})`);
-  if (isImage) {
-    const url = URL.createObjectURL(file);
-    setPreviewImage(url);
-  }
-  clipboardContent = { type: isImage ? 'Image' : 'File', blob: file, fileName: file.name, fileSize: file.size };
-  els.uploadBtn.disabled = false;
+  handleSelectedFile(file);
   els.fileInput.value = '';
 });
 
@@ -353,6 +403,12 @@ async function init() {
   await loadMaxSize();
   await loadHistory();
   await checkConnection();
+
+  if (isStandaloneView && shouldAutoPickFile) {
+    setPreviewText('Choose a file in this window. It stays open during selection.', true);
+    els.chooseFileBtn.focus();
+    setTimeout(() => openNativeFilePicker(true), 50);
+  }
 }
 
 init();
