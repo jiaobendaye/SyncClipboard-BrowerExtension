@@ -1,8 +1,9 @@
+import { browserApi } from './browser-api.js';
 import { createChromeStorage } from './storage.js';
 import { createMockStorage } from './storage-mock.js';
-import { testConnection, getProfile, putProfile, putFileData, getFileData, buildProfile, computeHash, downloadFile } from './webdav-client.js';
+import { testConnection, getProfile, putProfile, putFileData, buildProfile, computeHash, downloadFile } from './webdav-client.js';
 
-const storage = (typeof chrome !== 'undefined' && chrome.storage)
+const storage = browserApi.available
   ? createChromeStorage()
   : createMockStorage(typeof window !== 'undefined' ? window.__SYNC_STORAGE_PATH__ : undefined);
 
@@ -293,16 +294,8 @@ els.downloadBtn.addEventListener('click', async () => {
       await loadHistory();
       showBanner('Copied to clipboard', 'success');
     } else {
-      if (typeof chrome !== 'undefined' && chrome.downloads) {
+      if (browserApi.downloads) {
         await downloadFile(settings.webdav.url, settings.webdav.username, password, profile.dataName);
-      } else {
-        const blob = await getFileData(settings.webdav.url, settings.webdav.username, password, profile.dataName);
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = profile.dataName;
-        a.click();
-        URL.revokeObjectURL(url);
       }
 
       await storage.addHistory({

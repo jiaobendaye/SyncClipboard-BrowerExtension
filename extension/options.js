@@ -1,8 +1,9 @@
+import { browserApi } from './browser-api.js';
 import { createChromeStorage } from './storage.js';
 import { createMockStorage } from './storage-mock.js';
 import { testConnection } from './webdav-client.js';
 
-const storage = (typeof chrome !== 'undefined' && chrome.storage)
+const storage = browserApi.available
   ? createChromeStorage()
   : createMockStorage(typeof window !== 'undefined' ? window.__SYNC_STORAGE_PATH__ : undefined);
 

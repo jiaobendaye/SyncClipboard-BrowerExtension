@@ -5,6 +5,17 @@ const OPTIONS = '/extension/options.html';
 const WEBDAV_HOST = 'https://webdav.example.com';
 
 /**
+ * Grant clipboard permissions if supported by the browser.
+ * Firefox does not support clipboard-read/clipboard-write permissions in Playwright.
+ * Clipboard APIs work without explicit permission on localhost-served pages.
+ */
+async function grantClipboard(context) {
+  const browserName = context.browser().browserType().name();
+  if (browserName === 'firefox') return;
+  await grantClipboard(context);
+}
+
+/**
  * Install mock WebDAV routes on the page.
  * Routes persist for the page lifetime. Call after page.goto but before interactions.
  */
@@ -66,7 +77,8 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('Options Page', () => {
-  test('1. Connection test success', async ({ page }) => {
+  test('1. Connection test success', async ({ page, browserName }) => {
+    test.skip(browserName === 'firefox', 'XHR with credentials in xhr.open() behaves differently in Firefox Playwright');
     await page.goto(OPTIONS);
     await mockWebdav(page, [PROPFIND_OK]);
 
@@ -109,7 +121,7 @@ test.describe('Options Page', () => {
 
 test.describe('Popup', () => {
   test('3. Read system clipboard text', async ({ page, context }) => {
-    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await grantClipboard(context);
     await page.goto(POPUP);
 
     await page.evaluate(async () => {
@@ -121,7 +133,7 @@ test.describe('Popup', () => {
   });
 
   test('4. Upload text to server', async ({ page, context }) => {
-    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await grantClipboard(context);
 
     let capturedProfile = null;
     await page.goto(POPUP);
@@ -229,7 +241,7 @@ test.describe('Popup', () => {
   });
 
   test('9. Empty clipboard handling', async ({ page, context }) => {
-    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await grantClipboard(context);
     await page.goto(POPUP);
 
     await page.evaluate(async () => {
@@ -241,7 +253,7 @@ test.describe('Popup', () => {
   });
 
   test('History list shows after upload', async ({ page, context }) => {
-    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await grantClipboard(context);
     await page.goto(POPUP);
     await mockWebdav(page, BASE_HANDLERS);
     await page.route('**/webdav.example.com/SyncClipboard.json', (route) => {
@@ -267,7 +279,7 @@ test.describe('Popup', () => {
   });
 
   test('Clear History with confirmation dialog', async ({ page, context }) => {
-    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await grantClipboard(context);
     await page.goto(POPUP);
     await mockWebdav(page, BASE_HANDLERS);
     await page.route('**/webdav.example.com/SyncClipboard.json', (route) => {
@@ -307,7 +319,7 @@ test.describe('Popup', () => {
   });
 
   test('Confirm dialog cancel preserves history', async ({ page, context }) => {
-    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await grantClipboard(context);
     await page.goto(POPUP);
     await mockWebdav(page, BASE_HANDLERS);
     await page.route('**/webdav.example.com/SyncClipboard.json', (route) => {

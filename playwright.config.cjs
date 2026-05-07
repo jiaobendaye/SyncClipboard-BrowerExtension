@@ -4,6 +4,10 @@ export default defineConfig({
   testDir: './tests',
   timeout: 30000,
   retries: 0,
+  projects: [
+    { name: 'chromium', use: { browserName: 'chromium' } },
+    { name: 'firefox', use: { browserName: 'firefox' } },
+  ],
   use: {
     baseURL: 'http://localhost:8765',
     headless: true,

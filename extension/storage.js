@@ -2,8 +2,34 @@
 // All modules depend on StorageProvider interface, never on chrome.storage directly.
 // Auto-selects Chrome implementation in extension context.
 
+import { browserApi } from './browser-api.js';
+
 const DEFAULT_HISTORY_CAPACITY = 50;
 const DEFAULT_MAX_FILE_SIZE = 50 * 1024 * 1024;
+
+// Firefox may not support storage.session — if it falls back to storage.local,
+// we obfuscate the password before writing to persistent storage.
+const needsObfuscation = browserApi.storage.session === browserApi.storage.local;
+
+function obfuscate(text) {
+  const key = 'SyncClipboard';
+  const bytes = new TextEncoder().encode(text);
+  const parts = [];
+  for (let i = 0; i < bytes.length; i++) {
+    parts.push(String.fromCharCode(bytes[i] ^ key.charCodeAt(i % key.length)));
+  }
+  return btoa(parts.join(''));
+}
+
+function deobfuscate(encoded) {
+  const raw = atob(encoded);
+  const key = 'SyncClipboard';
+  const bytes = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) {
+    bytes[i] = raw.charCodeAt(i) ^ key.charCodeAt(i % key.length);
+  }
+  return new TextDecoder().decode(bytes);
+}
 
 /**
  * @typedef {Object} HistoryItem
@@ -61,25 +87,30 @@ function defaultSettings() {
 export function createChromeStorage() {
   return {
     async getSettings() {
-      const result = await chrome.storage.local.get(['settings']);
+      const result = await browserApi.storage.local.get(['settings']);
       return result.settings || defaultSettings();
     },
 
     async setSettings(settings) {
-      await chrome.storage.local.set({ settings });
+      await browserApi.storage.local.set({ settings });
     },
 
     async getPassword() {
-      const result = await chrome.storage.session.get(['password']);
-      return result.password || null;
+      const result = await browserApi.storage.session.get(['password']);
+      const password = result.password || null;
+      if (password && needsObfuscation) {
+        return deobfuscate(password);
+      }
+      return password;
     },
 
     async setPassword(password) {
-      await chrome.storage.session.set({ password });
+      const value = needsObfuscation ? obfuscate(password) : password;
+      await browserApi.storage.session.set({ password: value });
     },
 
     async getHistory() {
-      const result = await chrome.storage.local.get(['history']);
+      const result = await browserApi.storage.local.get(['history']);
       return result.history || [];
     },
 
@@ -89,11 +120,11 @@ export function createChromeStorage() {
       const settings = await this.getSettings();
       const max = settings.historyCapacity || DEFAULT_HISTORY_CAPACITY;
       if (history.length > max) history.length = max;
-      await chrome.storage.local.set({ history });
+      await browserApi.storage.local.set({ history });
     },
 
     async clearHistory() {
-      await chrome.storage.local.set({ history: [] });
+      await browserApi.storage.local.set({ history: [] });
     },
 
     async trimHistory() {
@@ -105,7 +136,7 @@ export function createChromeStorage() {
       if (history.length <= max) return 0;
       const removed = history.length - max;
       history.length = max;
-      await chrome.storage.local.set({ history });
+      await browserApi.storage.local.set({ history });
       return removed;
     }
   };

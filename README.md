@@ -40,6 +40,8 @@ docs/
 
 ## 安装使用
 
+### Chrome
+
 1. 打开 Chrome，访问 `chrome://extensions`
 2. 开启「开发者模式」
 3. 点击「加载已解压的扩展程序」，选择 `extension/` 目录
@@ -47,18 +49,30 @@ docs/
 5. 点击「Test Connection」测试连接，成功自动保存设置
 6. 回到弹出窗口，点击「Read Clipboard」读取剪贴板，点击「Upload to Server」上传
 
+### Firefox
+
+1. 打开 Firefox，访问 `about:debugging#/runtime/this-firefox`
+2. 点击「临时载入附加组件」，选择 `extension/` 目录中的任意文件
+3. 后续步骤与 Chrome 相同
+
 ## 密码存储
 
-密码使用 `chrome.storage.session` 存储，仅在当前浏览器会话期间保留。关闭浏览器后密码自动清除，重新打开需重新输入。服务器地址和用户名使用 `chrome.storage.local` 持久存储。
+密码使用浏览器会话存储（`storage.session`）保存，仅在当前浏览器会话期间保留。关闭浏览器后密码自动清除，重新打开需重新输入。
+
+Firefox 不支持 `storage.session`，密码以混淆形式存储在 `storage.local` 中，重启浏览器后仍然保留。
 
 ## 测试
 
 ```bash
+# 安装 Playwright 浏览器（首次运行测试前需要执行）
+npx playwright install chromium firefox
+
 # 单元测试
 npm run test:unit
 
 # Playwright E2E 测试
-npm run test
+npm run test           # Chromium（默认）
+npm run test:firefox   # Firefox
 npm run test:headed    # 有头模式
 ```
 

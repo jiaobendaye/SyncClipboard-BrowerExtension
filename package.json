@@ -5,8 +5,9 @@
   "type": "module",
   "description": "SyncClipboard Chrome Extension - Playwright tests",
   "scripts": {
-    "test": "playwright test",
+    "test": "playwright test --project=chromium",
     "test:headed": "playwright test --headed",
+    "test:firefox": "playwright test --project=firefox",
     "test:unit": "node --test tests/unit/*.test.js"
   },
   "devDependencies": {
