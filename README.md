@@ -55,9 +55,7 @@ docs/
 
 ## 密码存储
 
-密码使用浏览器会话存储（`storage.session`）保存，仅在当前浏览器会话期间保留。关闭浏览器后密码自动清除，重新打开需重新输入。
-
-Firefox 不支持 `storage.session`，密码以混淆形式存储在 `storage.local` 中，重启浏览器后仍然保留。
+密码以 XOR 混淆形式存储在 `storage.local` 中，重启浏览器后仍然保留。
 
 ## 测试
 

@@ -26,12 +26,12 @@ This is a **zero-build** Chrome Extension (Manifest V3). All JS files are plain 
 
 ```js
 const storage = (typeof chrome !== 'undefined' && chrome.storage)
-  ? createChromeStorage()   // chrome.storage.session + chrome.storage.local
+  ? createChromeStorage()   // chrome.storage.local
   : createMockStorage()      // localStorage or in-memory (Playwright/Node.js)
 ```
 
 - **Settings** (URL, username, maxFileSize, historyCapacity) → `chrome.storage.local` (persistent)
-- **Password** → `chrome.storage.session` (cleared when browser closes)
+- **Password** → `chrome.storage.local` (XOR-obfuscated)
 - **History** → `chrome.storage.local`
 
 ### WebDAV Client (`webdav-client.js`)

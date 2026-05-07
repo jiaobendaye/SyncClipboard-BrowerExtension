@@ -7,9 +7,7 @@ import { browserApi } from './browser-api.js';
 const DEFAULT_HISTORY_CAPACITY = 50;
 const DEFAULT_MAX_FILE_SIZE = 50 * 1024 * 1024;
 
-// Firefox may not support storage.session — if it falls back to storage.local,
-// we obfuscate the password before writing to persistent storage.
-const needsObfuscation = browserApi.storage.session === browserApi.storage.local;
+// Password is stored in chrome.storage.local (persistent) with XOR obfuscation.
 
 function obfuscate(text) {
   const key = 'SyncClipboard';
@@ -80,7 +78,7 @@ function defaultSettings() {
 /**
  * Chrome storage implementation.
  * Settings → chrome.storage.local
- * Password → chrome.storage.session (cleared on browser close)
+ * Password → chrome.storage.local (XOR-obfuscated)
  * History → chrome.storage.local
  * @returns {StorageProvider}
  */
@@ -96,17 +94,13 @@ export function createChromeStorage() {
     },
 
     async getPassword() {
-      const result = await browserApi.storage.session.get(['password']);
+      const result = await browserApi.storage.local.get(['password']);
       const password = result.password || null;
-      if (password && needsObfuscation) {
-        return deobfuscate(password);
-      }
-      return password;
+      return password ? deobfuscate(password) : null;
     },
 
     async setPassword(password) {
-      const value = needsObfuscation ? obfuscate(password) : password;
-      await browserApi.storage.session.set({ password: value });
+      await browserApi.storage.local.set({ password: obfuscate(password) });
     },
 
     async getHistory() {
