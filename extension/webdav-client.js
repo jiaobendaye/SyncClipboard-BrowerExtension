@@ -1,6 +1,6 @@
 // SyncClipboard WebDAV Protocol Client
 // Implements the Reference SyncClipboard.json protocol for cross-device compatibility.
-// Zero dependencies — uses only fetch() and Web Crypto API.
+// Zero dependencies — uses only XMLHttpRequest and Web Crypto API.
 
 import { browserApi } from './browser-api.js';
 
@@ -30,34 +30,34 @@ function base64Encode(str) {
   return btoa(binary);
 }
 
-function authHeaders(username, password) {
-  if (!username && !password) return {};
-  return { 'Authorization': 'Basic ' + base64Encode(username + ':' + password) };
-}
-
 function stripTrailingSlash(url) {
   return url.replace(/\/+$/, '');
 }
 
-async function request(method, baseUrl, username, password, path, body, contentType) {
+async function request(method, baseUrl, username, password, path, body, contentType, responseType = '') {
   const url = stripTrailingSlash(baseUrl) + path;
-  const headers = { ...authHeaders(username, password) };
-  if (contentType) headers['Content-Type'] = contentType;
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    // Pass credentials to open() to suppress native auth dialog on 401.
+    xhr.open(method, url, true, username || '', password || '');
+    xhr.timeout = TIMEOUT_MS;
+    if (contentType) xhr.setRequestHeader('Content-Type', contentType);
+    xhr.responseType = responseType;
 
-  try {
-    const res = await fetch(url, {
-      method,
-      headers,
-      body,
-      signal: controller.signal
-    });
-    return res;
-  } finally {
-    clearTimeout(timer);
-  }
+    xhr.onload = () => {
+      const status = xhr.status;
+      resolve({
+        status,
+        ok: status >= 200 && status < 300,
+        json: () => Promise.resolve(JSON.parse(xhr.responseText)),
+        blob: () => Promise.resolve(xhr.response instanceof Blob ? xhr.response : new Blob([xhr.response]))
+      });
+    };
+    xhr.onerror = () => reject(new Error('Network error'));
+    xhr.ontimeout = () => reject(new Error('Request timed out'));
+    xhr.send(body);
+  });
 }
 
 /**
@@ -116,7 +116,7 @@ export async function putProfile(baseUrl, username, password, profile) {
 export async function getFileData(baseUrl, username, password, fileName) {
   await ensureDir(baseUrl, username, password, FILE_DIR);
   const path = `${FILE_DIR}/${encodeURIComponent(fileName)}`;
-  const res = await request('GET', baseUrl, username, password, path);
+  const res = await request('GET', baseUrl, username, password, path, undefined, undefined, 'blob');
   if (!res.ok) {
     throw new Error(`Failed to download file ${fileName}: HTTP ${res.status}`);
   }

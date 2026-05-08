@@ -137,7 +137,7 @@ function handleSelectedFile(file) {
     setPreviewImage(url);
   }
   clipboardContent = { type: isImage ? 'Image' : 'File', blob: file, fileName: file.name, fileSize: file.size };
-  els.uploadBtn.disabled = false;
+  els.uploadBtn.disabled = !serverConfigured;
 }
 
 function getUploadBlob(content, profile) {
@@ -208,7 +208,7 @@ let serverConfigured = false;
 function setButtons(enabled) {
   els.readBtn.disabled = !enabled;
   els.chooseFileBtn.disabled = !enabled;
-  els.uploadBtn.disabled = !enabled;
+  els.uploadBtn.disabled = !enabled || !serverConfigured;
   els.downloadBtn.disabled = !enabled || !serverConfigured;
   els.previewServerBtn.disabled = !enabled || !serverConfigured;
 }
@@ -231,17 +231,22 @@ async function checkConnection() {
     if (!settings.webdav.url) {
       setStatus(false, '');
       serverConfigured = false;
+      els.uploadBtn.disabled = true;
       els.downloadBtn.disabled = true;
       els.previewServerBtn.disabled = true;
       return;
     }
-    serverConfigured = true;
-    els.downloadBtn.disabled = false;
-    els.previewServerBtn.disabled = false;
     const password = await storage.getPassword();
     const ok = await testConnection(settings.webdav.url, settings.webdav.username, password);
+    serverConfigured = ok;
+    els.downloadBtn.disabled = !ok;
+    els.previewServerBtn.disabled = !ok;
     setStatus(ok, settings.webdav.url);
   } catch {
+    serverConfigured = false;
+    els.uploadBtn.disabled = true;
+    els.downloadBtn.disabled = true;
+    els.previewServerBtn.disabled = true;
     setStatus(false, (await storage.getSettings()).webdav.url || '');
   }
 }
@@ -278,7 +283,7 @@ async function reDownload(item) {
   if (item.type === 'Text' && !item.fileName) {
     setPreviewText(item.text);
     clipboardContent = { type: 'Text', text: item.text, blob: null };
-    els.uploadBtn.disabled = false;
+    els.uploadBtn.disabled = !serverConfigured;
   }
 }
 
@@ -317,7 +322,7 @@ els.readBtn.addEventListener('click', async () => {
       setPreviewImage(url);
       const ext = imageType.split('/')[1] === 'jpeg' ? 'jpg' : imageType.split('/')[1];
       clipboardContent = { type: 'Image', blob, fileName: null, fileSize: blob.size, mimeType: imageType, ext };
-      els.uploadBtn.disabled = false;
+      els.uploadBtn.disabled = !serverConfigured;
     } else {
       const text = await navigator.clipboard.readText();
       if (!text) {
@@ -327,7 +332,7 @@ els.readBtn.addEventListener('click', async () => {
       }
       setPreviewText(getTextPreview(text));
       clipboardContent = { type: 'Text', text, blob: null };
-      els.uploadBtn.disabled = false;
+      els.uploadBtn.disabled = !serverConfigured;
     }
   } catch (err) {
     resetPreview();
@@ -412,7 +417,7 @@ els.downloadBtn.addEventListener('click', async () => {
 
       setPreviewText(getTextPreview(text || '(empty)'));
       clipboardContent = { type: 'Text', text, blob: null };
-      els.uploadBtn.disabled = false;
+      els.uploadBtn.disabled = !serverConfigured;
 
       try {
         await navigator.clipboard.writeText(text);

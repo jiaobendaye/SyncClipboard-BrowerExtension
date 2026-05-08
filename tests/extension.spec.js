@@ -604,6 +604,38 @@ test.describe('Popup', () => {
     await expect(page.locator('#upload-btn')).toBeDisabled();
   });
 
+  test('Preview and Download disabled without server config', async ({ page }) => {
+    await page.goto(POPUP);
+    // No seedSettings — storage is empty, no server configured
+    await expect(page.locator('#preview-server-btn')).toBeDisabled();
+    await expect(page.locator('#download-btn')).toBeDisabled();
+    await expect(page.locator('#upload-btn')).toBeDisabled();
+  });
+
+  test('Preview and Download enabled when server connected', async ({ page, browserName }) => {
+    test.skip(browserName === 'firefox', 'XHR with credentials in xhr.open() behaves differently in Firefox Playwright');
+    await page.goto(POPUP);
+    await mockWebdav(page, [PROPFIND_OK]);
+    await seedSettings(page);
+    await page.reload();
+    await mockWebdav(page, [PROPFIND_OK]);
+    // Upload still disabled (no clipboard read), Preview/Download enabled
+    await expect(page.locator('#upload-btn')).toBeDisabled();
+    await expect(page.locator('#preview-server-btn')).toBeEnabled();
+    await expect(page.locator('#download-btn')).toBeEnabled();
+  });
+
+  test('Preview and Download disabled when server disconnected', async ({ page }) => {
+    await page.goto(POPUP);
+    await mockWebdav(page, [PROPFIND_FAIL]);
+    await seedSettings(page);
+    await page.reload();
+    await mockWebdav(page, [PROPFIND_FAIL]);
+    await expect(page.locator('#preview-server-btn')).toBeDisabled();
+    await expect(page.locator('#download-btn')).toBeDisabled();
+    await expect(page.locator('#upload-btn')).toBeDisabled();
+  });
+
   test('Confirm dialog cancel preserves history', async ({ page, context }) => {
     await grantClipboard(context);
     await page.goto(POPUP);
