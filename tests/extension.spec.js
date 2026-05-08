@@ -636,6 +636,22 @@ test.describe('Popup', () => {
     await expect(page.locator('#upload-btn')).toBeDisabled();
   });
 
+  test('Upload enabled after reading clipboard with server connected', async ({ page, context, browserName }) => {
+    test.skip(browserName === 'firefox', 'XHR with credentials in xhr.open() behaves differently in Firefox Playwright');
+    await grantClipboard(context);
+    await page.goto(POPUP);
+    await mockWebdav(page, [PROPFIND_OK]);
+    await seedSettings(page);
+    await page.reload();
+    await mockWebdav(page, [PROPFIND_OK]);
+    await page.evaluate(async () => {
+      await navigator.clipboard.writeText('upload test content');
+    });
+    await page.click('#read-clipboard-btn');
+    await expect(page.locator('#preview-text')).not.toHaveText('No content read yet');
+    await expect(page.locator('#upload-btn')).toBeEnabled();
+  });
+
   test('Confirm dialog cancel preserves history', async ({ page, context }) => {
     await grantClipboard(context);
     await page.goto(POPUP);

@@ -151,7 +151,7 @@ function handleSelectedFile(file) {
     setPreviewImage(url);
   }
   clipboardContent = { type: isImage ? 'Image' : 'File', blob: file, fileName: file.name, fileSize: file.size };
-  els.uploadBtn.disabled = !serverConfigured;
+  updateActionButtons();
 }
 
 function getUploadBlob(content, profile) {
@@ -217,14 +217,26 @@ async function downloadProfileData(settings, password, fileName) {
   return downloadFileName;
 }
 
-let serverConfigured = false;
+let serverConnected = false;
 
 function setButtons(enabled) {
-  els.readBtn.disabled = !enabled;
-  els.chooseFileBtn.disabled = !enabled;
-  els.uploadBtn.disabled = !enabled || !serverConfigured || !clipboardContent;
-  els.downloadBtn.disabled = !enabled || !serverConfigured;
-  els.previewServerBtn.disabled = !enabled || !serverConfigured;
+  if (!enabled) {
+    els.readBtn.disabled = true;
+    els.chooseFileBtn.disabled = true;
+    els.uploadBtn.disabled = true;
+    els.downloadBtn.disabled = true;
+    els.previewServerBtn.disabled = true;
+  } else {
+    els.readBtn.disabled = false;
+    els.chooseFileBtn.disabled = false;
+    updateActionButtons();
+  }
+}
+
+function updateActionButtons() {
+  els.uploadBtn.disabled = !serverConnected || !clipboardContent;
+  els.downloadBtn.disabled = !serverConnected;
+  els.previewServerBtn.disabled = !serverConnected;
 }
 
 function setStatus(connected, url) {
@@ -244,23 +256,18 @@ async function checkConnection() {
     const settings = await storage.getSettings();
     if (!settings.webdav.url) {
       setStatus(false, '');
-      serverConfigured = false;
-      els.uploadBtn.disabled = true;
-      els.downloadBtn.disabled = true;
-      els.previewServerBtn.disabled = true;
+      serverConnected = false;
+      updateActionButtons();
       return;
     }
     const password = await storage.getPassword();
     const ok = await testConnection(settings.webdav.url, settings.webdav.username, password);
-    serverConfigured = ok;
-    els.downloadBtn.disabled = !ok;
-    els.previewServerBtn.disabled = !ok;
+    serverConnected = ok;
+    updateActionButtons();
     setStatus(ok, settings.webdav.url);
   } catch {
-    serverConfigured = false;
-    els.uploadBtn.disabled = true;
-    els.downloadBtn.disabled = true;
-    els.previewServerBtn.disabled = true;
+    serverConnected = false;
+    updateActionButtons();
     setStatus(false, (await storage.getSettings()).webdav.url || '');
   }
 }
@@ -298,7 +305,7 @@ async function reDownload(item) {
   if (item.type === 'Text' && !item.fileName) {
     setPreviewText(item.text);
     clipboardContent = { type: 'Text', text: item.text, blob: null };
-    els.uploadBtn.disabled = !serverConfigured;
+    updateActionButtons();
   }
 }
 
@@ -337,7 +344,7 @@ els.readBtn.addEventListener('click', async () => {
       setPreviewImage(url);
       const ext = imageType.split('/')[1] === 'jpeg' ? 'jpg' : imageType.split('/')[1];
       clipboardContent = { type: 'Image', blob, fileName: null, fileSize: blob.size, mimeType: imageType, ext };
-      els.uploadBtn.disabled = !serverConfigured;
+      updateActionButtons();
     } else {
       const text = await navigator.clipboard.readText();
       if (!text) {
@@ -347,7 +354,7 @@ els.readBtn.addEventListener('click', async () => {
       }
       setPreviewText(getTextPreview(text));
       clipboardContent = { type: 'Text', text, blob: null };
-      els.uploadBtn.disabled = !serverConfigured;
+      updateActionButtons();
     }
   } catch (err) {
     resetPreview();
@@ -433,7 +440,7 @@ els.downloadBtn.addEventListener('click', async () => {
 
       setPreviewText(getTextPreview(text || '(empty)'));
       clipboardContent = { type: 'Text', text, blob: null };
-      els.uploadBtn.disabled = !serverConfigured;
+      updateActionButtons();
 
       try {
         await navigator.clipboard.writeText(text);
