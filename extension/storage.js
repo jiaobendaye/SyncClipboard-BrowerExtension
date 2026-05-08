@@ -37,6 +37,7 @@ function deobfuscate(encoded) {
  * @property {string} [fileName]
  * @property {number} size
  * @property {number} timestamp
+ * @property {string} [direction] - "up" | "down"
  */
 
 /**
