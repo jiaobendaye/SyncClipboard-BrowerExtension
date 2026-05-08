@@ -14,6 +14,8 @@ const els = {
   previewText: document.getElementById('preview-text'),
   previewImage: document.getElementById('preview-image'),
   previewBox: document.getElementById('clipboard-preview'),
+  serverPreviewText: document.getElementById('server-preview-text'),
+  serverPreviewBox: document.getElementById('server-preview'),
   readBtn: document.getElementById('read-clipboard-btn'),
   fileInput: document.getElementById('file-input'),
   chooseFileBtn: document.getElementById('choose-file-btn'),
@@ -80,6 +82,18 @@ function resetPreview() {
   els.previewImage.style.display = 'none';
   els.previewText.style.display = '';
   els.previewBox.classList.add('empty');
+}
+
+function setServerPreview(text, placeholder) {
+  els.serverPreviewText.textContent = text;
+  els.serverPreviewText.className = placeholder ? 'placeholder' : '';
+  els.serverPreviewBox.classList.remove('empty');
+}
+
+function resetServerPreview() {
+  els.serverPreviewText.textContent = 'Not fetched yet';
+  els.serverPreviewText.className = 'placeholder';
+  els.serverPreviewBox.classList.add('empty');
 }
 
 function getTextPreview(text, maxChars = 200) {
@@ -474,11 +488,7 @@ els.previewServerBtn.addEventListener('click', async () => {
   setButtons(false);
   els.previewServerBtn.textContent = 'Loading...';
 
-  els.previewImage.style.display = 'none';
-  els.previewText.style.display = '';
-  els.previewText.textContent = 'Loading server content...';
-  els.previewText.className = 'placeholder';
-  els.previewBox.classList.remove('empty');
+  setServerPreview('Loading server content...', true);
 
   try {
     const password = await storage.getPassword();
@@ -491,32 +501,32 @@ els.previewServerBtn.addEventListener('click', async () => {
     ]);
 
     if (profile.hash === '' && profile.text === '' && !profile.hasData) {
-      setPreviewText('No clipboard on server', true);
+      setServerPreview('No clipboard on server', true);
       return;
     }
 
     let displayText;
     if (profile.type === 'Text' && !profile.hasData) {
       const preview = getTextPreview(profile.text || '(empty)');
-      displayText = 'Server: ' + preview;
+      displayText = preview;
     } else if (profile.type === 'Text' && profile.hasData) {
-      displayText = 'Server: [Text] ' + profile.dataName + ' (' + formatSize(profile.size) + ')';
+      displayText = '[Text] ' + profile.dataName + ' (' + formatSize(profile.size) + ')';
     } else if (profile.type === 'Image') {
-      displayText = 'Server: [Image] ' + profile.dataName + ' (' + formatSize(profile.size) + ')';
+      displayText = '[Image] ' + profile.dataName + ' (' + formatSize(profile.size) + ')';
     } else if (profile.type === 'File') {
-      displayText = 'Server: [File] ' + profile.dataName + ' (' + formatSize(profile.size) + ')';
+      displayText = '[File] ' + profile.dataName + ' (' + formatSize(profile.size) + ')';
     } else if (profile.type === 'Group') {
-      displayText = 'Server: [Group] (not previewable)';
+      displayText = '[Group] (not previewable)';
     } else {
-      displayText = 'Server: (empty)';
+      displayText = '(empty)';
     }
-    setPreviewText(displayText);
+    setServerPreview(displayText);
   } catch (err) {
     if (err.name === 'TimeoutError') {
-      setPreviewText('Server did not respond', true);
+      setServerPreview('Server did not respond', true);
     } else {
       showBanner(err.message || 'Preview failed', 'error');
-      resetPreview();
+      resetServerPreview();
     }
   } finally {
     els.previewServerBtn.textContent = 'Preview';
