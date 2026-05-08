@@ -42,6 +42,9 @@ async function request(method, baseUrl, username, password, path, body, contentT
     // Pass credentials to open() to suppress native auth dialog on 401.
     xhr.open(method, url, true, username || '', password || '');
     xhr.timeout = TIMEOUT_MS;
+    if (username || password) {
+      xhr.setRequestHeader('Authorization', 'Basic ' + base64Encode((username || '') + ':' + (password || '')));
+    }
     if (contentType) xhr.setRequestHeader('Content-Type', contentType);
     xhr.responseType = responseType;
 
@@ -128,7 +131,7 @@ export async function getFileData(baseUrl, username, password, fileName) {
  * @param {Blob} blob
  */
 export async function putFileData(baseUrl, username, password, fileName, blob) {
-  await ensureDir(baseUrl, username, password, FILE_DIR);
+  // await ensureDir(baseUrl, username, password, FILE_DIR);
   const path = `${FILE_DIR}/${encodeURIComponent(fileName)}`;
   const res = await request('PUT', baseUrl, username, password, path, blob, 'application/octet-stream');
   if (!res.ok) {
