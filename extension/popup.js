@@ -19,6 +19,7 @@ const els = {
   chooseFileBtn: document.getElementById('choose-file-btn'),
   uploadBtn: document.getElementById('upload-btn'),
   downloadBtn: document.getElementById('download-btn'),
+  previewServerBtn: document.getElementById('preview-server-btn'),
   historyList: document.getElementById('history-list'),
   historyHeader: document.getElementById('history-header'),
   clearHistoryBtn: document.getElementById('clear-history-btn'),
@@ -54,7 +55,7 @@ function showBanner(msg, type) {
   const banner = document.createElement('div');
   banner.className = type === 'success' ? 'success-banner' : 'error-banner';
   banner.textContent = msg;
-  els.uploadBtn.parentNode.insertBefore(banner, els.uploadBtn.parentNode.firstChild);
+  els.uploadBtn.parentNode.parentNode.insertBefore(banner, els.uploadBtn.parentNode);
   setTimeout(() => banner.remove(), 5000);
 }
 
@@ -202,11 +203,14 @@ async function downloadProfileData(settings, password, fileName) {
   return downloadFileName;
 }
 
+let serverConfigured = false;
+
 function setButtons(enabled) {
   els.readBtn.disabled = !enabled;
   els.chooseFileBtn.disabled = !enabled;
   els.uploadBtn.disabled = !enabled;
-  els.downloadBtn.disabled = !enabled;
+  els.downloadBtn.disabled = !enabled || !serverConfigured;
+  els.previewServerBtn.disabled = !enabled || !serverConfigured;
 }
 
 function setStatus(connected, url) {
@@ -226,8 +230,14 @@ async function checkConnection() {
     const settings = await storage.getSettings();
     if (!settings.webdav.url) {
       setStatus(false, '');
+      serverConfigured = false;
+      els.downloadBtn.disabled = true;
+      els.previewServerBtn.disabled = true;
       return;
     }
+    serverConfigured = true;
+    els.downloadBtn.disabled = false;
+    els.previewServerBtn.disabled = false;
     const password = await storage.getPassword();
     const ok = await testConnection(settings.webdav.url, settings.webdav.username, password);
     setStatus(ok, settings.webdav.url);
@@ -375,7 +385,7 @@ els.uploadBtn.addEventListener('click', async () => {
     showBanner(err.message || 'Upload failed', 'error');
   } finally {
     setButtons(true);
-    els.uploadBtn.textContent = 'Upload to Server';
+    els.uploadBtn.textContent = 'Upload';
   }
 });
 
@@ -443,7 +453,69 @@ els.downloadBtn.addEventListener('click', async () => {
     }
   } finally {
     setButtons(true);
-    els.downloadBtn.textContent = 'Download from Server';
+    els.downloadBtn.textContent = 'Download';
+  }
+});
+
+els.previewServerBtn.addEventListener('click', async () => {
+  if (els.previewServerBtn.disabled) return;
+
+  const settings = await storage.getSettings();
+  if (!settings.webdav.url) {
+    showBanner('Configure WebDAV server in Settings first', 'error');
+    return;
+  }
+
+  setButtons(false);
+  els.previewServerBtn.textContent = 'Loading...';
+
+  els.previewImage.style.display = 'none';
+  els.previewText.style.display = '';
+  els.previewText.textContent = 'Loading server content...';
+  els.previewText.className = 'placeholder';
+  els.previewBox.classList.remove('empty');
+
+  try {
+    const password = await storage.getPassword();
+    const TIMEOUT_MS = 10000;
+    const timeoutError = new Error('Preview timed out');
+    timeoutError.name = 'TimeoutError';
+    const profile = await Promise.race([
+      getProfile(settings.webdav.url, settings.webdav.username, password),
+      new Promise((_, reject) => setTimeout(() => reject(timeoutError), TIMEOUT_MS))
+    ]);
+
+    if (profile.hash === '' && profile.text === '' && !profile.hasData) {
+      setPreviewText('No clipboard on server', true);
+      return;
+    }
+
+    let displayText;
+    if (profile.type === 'Text' && !profile.hasData) {
+      const preview = getTextPreview(profile.text || '(empty)');
+      displayText = 'Server: ' + preview;
+    } else if (profile.type === 'Text' && profile.hasData) {
+      displayText = 'Server: [Text] ' + profile.dataName + ' (' + formatSize(profile.size) + ')';
+    } else if (profile.type === 'Image') {
+      displayText = 'Server: [Image] ' + profile.dataName + ' (' + formatSize(profile.size) + ')';
+    } else if (profile.type === 'File') {
+      displayText = 'Server: [File] ' + profile.dataName + ' (' + formatSize(profile.size) + ')';
+    } else if (profile.type === 'Group') {
+      displayText = 'Server: [Group] (not previewable)';
+    } else {
+      displayText = 'Server: (empty)';
+    }
+    setPreviewText(displayText);
+  } catch (err) {
+    if (err.name === 'TimeoutError') {
+      setPreviewText('Server did not respond', true);
+    } else {
+      showBanner(err.message || 'Preview failed', 'error');
+      resetPreview();
+    }
+  } finally {
+    els.previewServerBtn.textContent = 'Preview';
+    setButtons(true);
   }
 });
 

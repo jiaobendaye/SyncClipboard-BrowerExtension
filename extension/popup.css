@@ -168,10 +168,11 @@ section {
 
 #actions {
   display: flex;
-  gap: 8px;
+  flex-direction: row;
+  gap: 6px;
 }
 
-#actions .btn { flex: 1; }
+#actions .btn { flex: 1; font-size: 12px; padding: 7px 6px; }
 
 /* History */
 #history-list {
