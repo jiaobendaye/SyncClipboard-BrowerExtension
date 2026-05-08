@@ -39,6 +39,19 @@ async function loadSettings() {
   }
 }
 
+function clearResults() {
+  els.testResult.textContent = '';
+  els.testResult.className = '';
+  els.saveResult.textContent = '';
+  els.saveResult.className = '';
+}
+
+els.url.addEventListener('input', clearResults);
+els.username.addEventListener('input', clearResults);
+els.password.addEventListener('input', clearResults);
+els.maxSizeInput.addEventListener('input', clearResults);
+els.historyCapacityInput.addEventListener('input', clearResults);
+
 els.testBtn.addEventListener('click', async () => {
   els.testBtn.disabled = true;
   els.testBtn.textContent = 'Testing...';
