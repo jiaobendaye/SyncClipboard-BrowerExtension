@@ -453,7 +453,7 @@ els.downloadBtn.addEventListener('click', async () => {
     const password = await storage.getPassword();
     const profile = await getProfile(settings.webdav.url, settings.webdav.username, password);
 
-    if (profile.hash === '' && profile.text === '' && !profile.hasData) {
+    if (profile.hash === '' ||  profile.size === 0) {
       setServerPreview('No clipboard on server', true);
       return;
     }
@@ -539,7 +539,7 @@ els.previewServerBtn.addEventListener('click', async () => {
       new Promise((_, reject) => setTimeout(() => reject(timeoutError), TIMEOUT_MS))
     ]);
 
-    if (profile.hash === '' && profile.text === '' && !profile.hasData) {
+    if (profile.hash === '' ||  profile.size === 0) {
       setServerPreview('No clipboard on server', true);
       return;
     }
