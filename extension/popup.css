@@ -224,6 +224,14 @@ section {
   text-align: center;
 }
 
+.history-item .direction-icon {
+  color: #666;
+  font-weight: bold;
+  flex-shrink: 0;
+  width: 16px;
+  text-align: center;
+}
+
 .history-item .item-text {
   flex: 1;
   overflow: hidden;

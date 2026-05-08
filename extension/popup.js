@@ -280,7 +280,8 @@ async function loadHistory() {
     const li = document.createElement('li');
     li.className = 'history-item';
     const icon = item.type === 'Text' ? '&#x1F4CB;' : item.type === 'Image' ? '&#x1F5BC;' : '&#x1F4C4;';
-    li.innerHTML = `<span class="type-icon">${icon}</span><span class="item-text">${escapeHtml(item.text)}</span><span class="item-time">${formatTime(item.timestamp)}</span>`;
+    const directionIcon = item.direction === 'up' ? '&#x2191;' : '&#x2193;';
+    li.innerHTML = `<span class="direction-icon">${directionIcon}</span><span class="type-icon">${icon}</span><span class="item-text">${escapeHtml(item.text)}</span><span class="item-time">${formatTime(item.timestamp)}</span>`;
     li.addEventListener('click', () => reDownload(item));
     els.historyList.appendChild(li);
   }
@@ -395,7 +396,8 @@ els.uploadBtn.addEventListener('click', async () => {
       text: profile.text,
       fileName: profile.dataName,
       size: profile.size,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      direction: 'up'
     });
 
     showBanner('Uploaded successfully', 'success');
@@ -444,7 +446,8 @@ els.downloadBtn.addEventListener('click', async () => {
         text: profile.hasData ? profile.text : text,
         fileName: profile.hasData ? profile.dataName : null,
         size: profile.size,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        direction: 'down'
       });
       await loadHistory();
       showBanner('Copied to clipboard', 'success');
@@ -456,7 +459,8 @@ els.downloadBtn.addEventListener('click', async () => {
         text: profile.text,
         fileName: profile.dataName,
         size: profile.size,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        direction: 'down'
       });
       await loadHistory();
       const bannerMessage = savedFileName === profile.dataName
