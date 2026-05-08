@@ -157,6 +157,25 @@ function handleSelectedFile(file) {
   updateActionButtons();
 }
 
+function formatProfileDisplay(profile) {
+  if (profile.type === 'Text' && !profile.hasData) {
+    return getTextPreview(profile.text || '(empty)');
+  }
+  if (profile.type === 'Text' && profile.hasData) {
+    return '[Text] ' + profile.dataName + ' (' + formatSize(profile.size) + ')';
+  }
+  if (profile.type === 'Image') {
+    return '[Image] ' + profile.dataName + ' (' + formatSize(profile.size) + ')';
+  }
+  if (profile.type === 'File') {
+    return '[File] ' + profile.dataName + ' (' + formatSize(profile.size) + ')';
+  }
+  if (profile.type === 'Group') {
+    return '[Group] (not previewable)';
+  }
+  return '(empty)';
+}
+
 function getUploadBlob(content, profile) {
   if (!profile.hasData) return null;
   if (content.blob) return content.blob;
@@ -434,6 +453,12 @@ els.downloadBtn.addEventListener('click', async () => {
     const password = await storage.getPassword();
     const profile = await getProfile(settings.webdav.url, settings.webdav.username, password);
 
+    if (profile.hash === '' && profile.text === '' && !profile.hasData) {
+      setServerPreview('No clipboard on server', true);
+      return;
+    }
+    setServerPreview(formatProfileDisplay(profile));
+
     if (profile.type === 'Text') {
       let text = profile.text || '';
       if (profile.hasData) {
@@ -519,22 +544,7 @@ els.previewServerBtn.addEventListener('click', async () => {
       return;
     }
 
-    let displayText;
-    if (profile.type === 'Text' && !profile.hasData) {
-      const preview = getTextPreview(profile.text || '(empty)');
-      displayText = preview;
-    } else if (profile.type === 'Text' && profile.hasData) {
-      displayText = '[Text] ' + profile.dataName + ' (' + formatSize(profile.size) + ')';
-    } else if (profile.type === 'Image') {
-      displayText = '[Image] ' + profile.dataName + ' (' + formatSize(profile.size) + ')';
-    } else if (profile.type === 'File') {
-      displayText = '[File] ' + profile.dataName + ' (' + formatSize(profile.size) + ')';
-    } else if (profile.type === 'Group') {
-      displayText = '[Group] (not previewable)';
-    } else {
-      displayText = '(empty)';
-    }
-    setServerPreview(displayText);
+    setServerPreview(formatProfileDisplay(profile));
   } catch (err) {
     if (err.name === 'TimeoutError') {
       setServerPreview('Server did not respond', true);
