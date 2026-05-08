@@ -222,7 +222,7 @@ let serverConfigured = false;
 function setButtons(enabled) {
   els.readBtn.disabled = !enabled;
   els.chooseFileBtn.disabled = !enabled;
-  els.uploadBtn.disabled = !enabled || !serverConfigured;
+  els.uploadBtn.disabled = !enabled || !serverConfigured || !clipboardContent;
   els.downloadBtn.disabled = !enabled || !serverConfigured;
   els.previewServerBtn.disabled = !enabled || !serverConfigured;
 }
