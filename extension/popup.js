@@ -131,10 +131,13 @@ function openNativeFilePicker(bestEffort = false) {
 }
 
 function openStandaloneFilePicker() {
+  const w = 360, h = 760;
+  const left = Math.round((screen.width - w) / 2);
+  const top = Math.round((screen.height - h) / 2);
   const pickerWindow = window.open(
     buildStandalonePopupUrl(),
     '_blank',
-    'popup=yes,width=440,height=760'
+    `popup=yes,width=${w},height=${h},left=${left},top=${top}`
   );
   if (!pickerWindow) return false;
   if (typeof pickerWindow.focus === 'function') pickerWindow.focus();
