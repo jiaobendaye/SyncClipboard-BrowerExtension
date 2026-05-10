@@ -117,7 +117,7 @@ export async function putProfile(baseUrl, username, password, profile) {
  * @returns {Promise<Blob>}
  */
 export async function getFileData(baseUrl, username, password, fileName) {
-  await ensureDir(baseUrl, username, password, FILE_DIR);
+  // await ensureDir(baseUrl, username, password, FILE_DIR);
   const path = `${FILE_DIR}/${encodeURIComponent(fileName)}`;
   const res = await request('GET', baseUrl, username, password, path, undefined, undefined, 'blob');
   if (!res.ok) {
@@ -131,7 +131,7 @@ export async function getFileData(baseUrl, username, password, fileName) {
  * @param {Blob} blob
  */
 export async function putFileData(baseUrl, username, password, fileName, blob) {
-  // await ensureDir(baseUrl, username, password, FILE_DIR);
+  await ensureDir(baseUrl, username, password, FILE_DIR);
   const path = `${FILE_DIR}/${encodeURIComponent(fileName)}`;
   const res = await request('PUT', baseUrl, username, password, path, blob, 'application/octet-stream');
   if (!res.ok) {
