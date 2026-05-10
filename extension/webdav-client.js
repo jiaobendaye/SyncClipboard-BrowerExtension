@@ -6,7 +6,7 @@ import { browserApi } from './browser-api.js';
 
 const PROFILE_PATH = '/SyncClipboard.json';
 const FILE_DIR = '/file';
-const TIMEOUT_MS = 30000;
+const TIMEOUT_MS = 3000;
 const TEXT_INLINE_MAX_BYTES = 1024;
 const textEncoder = new TextEncoder();
 

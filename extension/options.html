@@ -10,43 +10,63 @@
 <div id="app">
   <h1>SyncClipboard Settings</h1>
 
-  <section>
-    <h2>WebDAV Server</h2>
-    <div class="field">
-      <label for="webdav-url">URL</label>
-      <input type="url" id="webdav-url" placeholder="https://webdav.example.com/sync/">
-    </div>
-    <div class="field">
-      <label for="webdav-username">Username</label>
-      <input type="text" id="webdav-username" placeholder="user">
-    </div>
-    <div class="field">
-      <label for="webdav-password">Password</label>
-      <input type="password" id="webdav-password" placeholder="••••••••">
-    </div>
-    <div class="field-row">
-      <button id="test-connection-btn" class="btn secondary">Test Connection</button>
-      <span id="test-result"></span>
+  <section id="servers-section">
+    <div class="section-label">Servers</div>
+    <div id="server-list" role="list" aria-label="Server list"></div>
+    <button id="add-server-btn" class="btn add-server-btn">
+      <span class="add-icon">+</span> Add Server
+    </button>
+
+    <div id="server-edit-form" class="server-edit-form" hidden>
+      <div id="edit-form-header" class="form-header">New Server</div>
+      <div class="form-row">
+        <label for="server-name-input">Server Name</label>
+        <input type="text" id="server-name-input" placeholder="e.g. Work NAS">
+      </div>
+      <div class="form-row">
+        <label for="server-url-input">URL</label>
+        <input type="url" id="server-url-input" placeholder="https://webdav.example.com/sync/">
+      </div>
+      <div class="form-row-flex">
+        <div class="form-row">
+          <label for="server-username-input">Username</label>
+          <input type="text" id="server-username-input" placeholder="user">
+        </div>
+        <div class="form-row">
+          <label for="server-password-input">Password</label>
+          <input type="password" id="server-password-input" placeholder="••••••••">
+        </div>
+      </div>
+      <div class="test-row">
+        <button id="test-connection-btn" class="btn secondary">Test Connection</button>
+        <span id="test-result" class="test-result" aria-live="polite"></span>
+      </div>
+      <div class="form-actions">
+        <button id="cancel-edit-btn" class="btn secondary">Cancel</button>
+        <button id="save-server-btn" class="btn primary">Save</button>
+      </div>
     </div>
   </section>
 
-  <section>
-    <h2>Limits</h2>
-    <div class="field">
-      <label for="max-size-input">Max upload size (MB)</label>
-      <input type="number" id="max-size-input" min="1" max="1024" placeholder="50">
-      <span id="max-size-error" class="field-error"></span>
-    </div>
-    <div class="field">
-      <label for="history-capacity-input">Recent history capacity</label>
-      <input type="number" id="history-capacity-input" min="1" max="500" placeholder="50">
-      <span id="history-capacity-error" class="field-error"></span>
+  <section id="limits-section">
+    <div class="section-label">Limits</div>
+    <div class="limits-grid">
+      <div class="field">
+        <label for="max-size-input">Max upload size (MB)</label>
+        <input type="number" id="max-size-input" min="1" max="1024" placeholder="50">
+        <span id="max-size-error" class="field-error"></span>
+      </div>
+      <div class="field">
+        <label for="history-capacity-input">History capacity</label>
+        <input type="number" id="history-capacity-input" min="1" max="500" placeholder="50">
+        <span id="history-capacity-error" class="field-error"></span>
+      </div>
     </div>
   </section>
 
-  <div class="actions">
-    <button id="save-btn" class="btn primary">Save Settings</button>
-    <span id="save-result"></span>
+  <div class="save-bar">
+    <button id="save-settings-btn" class="btn primary">Save Settings</button>
+    <span id="save-result" aria-live="polite"></span>
   </div>
 </div>
 

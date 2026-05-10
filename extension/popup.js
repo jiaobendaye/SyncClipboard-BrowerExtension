@@ -1,14 +1,18 @@
 import { browserApi } from './browser-api.js';
 import { createChromeStorage } from './storage.js';
 import { createMockStorage } from './storage-mock.js';
-import { testConnection, getProfile, putProfile, putFileData, getFileData, buildProfile, computeHash, createTextTransferBlob, downloadFile, downloadBlob } from './webdav-client.js';
+import { testConnection, getProfile, putProfile, putFileData, getFileData, buildProfile, createTextTransferBlob, downloadFile, downloadBlob } from './webdav-client.js';
 
 const storage = browserApi.available
   ? createChromeStorage()
   : createMockStorage(typeof window !== 'undefined' ? window.__SYNC_STORAGE_PATH__ : undefined);
 
 const els = {
-  statusBar: document.getElementById('status-bar'),
+  serverSelector: document.getElementById('server-selector'),
+  serverSelectorBtn: document.getElementById('server-selector-btn'),
+  activeServerName: document.getElementById('active-server-name'),
+  serverDropdown: document.getElementById('server-dropdown'),
+  statusInfo: document.getElementById('status-info'),
   statusDot: document.getElementById('status-dot'),
   statusText: document.getElementById('status-text'),
   previewText: document.getElementById('preview-text'),
@@ -32,6 +36,8 @@ const els = {
 };
 
 let clipboardContent = null;
+let settings = null;
+let serverConnected = false;
 const viewParams = new URLSearchParams(window.location.search);
 const isStandaloneView = viewParams.get('mode') === 'standalone';
 const shouldAutoPickFile = viewParams.get('pick') === 'file';
@@ -49,6 +55,14 @@ function formatTime(ts) {
   if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
   if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
   return Math.floor(diff / 86400000) + 'd ago';
+}
+
+function getHostname(url) {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
 }
 
 function showBanner(msg, type) {
@@ -141,7 +155,6 @@ function openStandaloneFilePicker() {
   );
   if (!pickerWindow) return false;
   if (typeof pickerWindow.focus === 'function') pickerWindow.focus();
-  // Close the action popup after handing off to a regular extension page.
   window.close();
   return true;
 }
@@ -213,20 +226,20 @@ function getCompatibleDownloadFileName(fileName) {
   }).join('/');
 }
 
-async function downloadProfileData(settings, password, fileName) {
+async function downloadProfileData(server, fileName) {
   const downloadFileName = getCompatibleDownloadFileName(fileName);
   const needsCompatibleName = downloadFileName !== fileName;
 
   if (browserApi.canDownload && !needsCompatibleName) {
     try {
-      await downloadFile(settings.webdav.url, settings.webdav.username, password, downloadFileName);
+      await downloadFile(server.url, server.username, server.password, downloadFileName);
       return downloadFileName;
     } catch (err) {
       if (!isInvalidDownloadFilenameError(err)) throw err;
     }
   }
 
-  const blob = await getFileData(settings.webdav.url, settings.webdav.username, password, fileName);
+  const blob = await getFileData(server.url, server.username, server.password, fileName);
   if (browserApi.canDownload) {
     try {
       await downloadBlob(downloadFileName, blob);
@@ -238,8 +251,6 @@ async function downloadProfileData(settings, password, fileName) {
   saveBlobLocally(downloadFileName, blob);
   return downloadFileName;
 }
-
-let serverConnected = false;
 
 function setButtons(enabled) {
   if (!enabled) {
@@ -261,48 +272,129 @@ function updateActionButtons() {
   els.previewServerBtn.disabled = !serverConnected;
 }
 
-function setStatus(connected, url) {
-  if (!url) {
-    els.statusDot.className = 'dot disconnected';
-    els.statusText.textContent = 'No server configured — click to set up';
+function renderDropdown() {
+  els.serverDropdown.innerHTML = '';
+
+  for (const server of settings.servers) {
+    const item = document.createElement('div');
+    item.className = 'dd-item' + (server.id === settings.activeServerId ? ' active' : '');
+    item.setAttribute('role', 'option');
+    item.setAttribute('aria-selected', server.id === settings.activeServerId ? 'true' : 'false');
+    item.dataset.serverId = server.id;
+    const displayName = server.name || getHostname(server.url);
+    const hostname = getHostname(server.url);
+    item.innerHTML = `
+      <span class="dd-server-icon">&#127760;</span>
+      <span class="dd-server-name">${escapeHtml(displayName)}</span>
+      <span class="dd-server-host">${escapeHtml(hostname)}</span>
+      ${server.id === settings.activeServerId ? '<span class="check">✓</span>' : ''}
+    `;
+    item.addEventListener('click', () => selectServer(server.id));
+    els.serverDropdown.appendChild(item);
+  }
+
+  const divider = document.createElement('div');
+  divider.className = 'dd-divider';
+  els.serverDropdown.appendChild(divider);
+
+  const addItem = document.createElement('div');
+  addItem.className = 'dd-item add-item';
+  addItem.setAttribute('role', 'option');
+  addItem.innerHTML = '<span>+</span><span>Add New Server...</span>';
+  addItem.addEventListener('click', () => {
+    closeDropdown();
+    window.open('options.html#servers', '_blank');
+  });
+  els.serverDropdown.appendChild(addItem);
+}
+
+function openDropdown() {
+  renderDropdown();
+  els.serverDropdown.classList.add('open');
+  els.serverSelectorBtn.setAttribute('aria-expanded', 'true');
+}
+
+function closeDropdown() {
+  els.serverDropdown.classList.remove('open');
+  els.serverSelectorBtn.setAttribute('aria-expanded', 'false');
+}
+
+function toggleDropdown(e) {
+  e.stopPropagation();
+  if (els.serverDropdown.classList.contains('open')) {
+    closeDropdown();
   } else {
-    els.statusDot.className = connected ? 'dot connected' : 'dot disconnected';
-    els.statusText.textContent = connected ? url : 'Disconnected — click to reconfigure';
+    openDropdown();
   }
 }
 
-async function checkConnection() {
+els.serverSelectorBtn.addEventListener('click', toggleDropdown);
+
+document.addEventListener('click', (e) => {
+  if (!els.serverSelector.contains(e.target)) closeDropdown();
+});
+
+els.serverSelectorBtn.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeDropdown();
+});
+
+async function selectServer(serverId) {
+  closeDropdown();
+  if (serverId === settings.activeServerId) return;
+
+  await storage.setActiveServer(serverId);
+  settings = await storage.getSettings();
+
+  const server = settings.servers.find(s => s.id === serverId);
+  const displayName = server?.name || getHostname(server?.url);
+  els.activeServerName.textContent = displayName;
+
   els.statusDot.className = 'dot checking';
-  els.statusText.textContent = 'Checking...';
+  els.statusText.textContent = 'Switching to ' + displayName + '...';
+  serverConnected = false;
+  updateActionButtons();
+
+  await checkConnection();
+}
+
+async function checkConnection() {
+  const server = await storage.getActiveServer();
+  if (!server) {
+    els.serverSelector.hidden = true;
+    els.statusDot.className = 'dot disconnected';
+    els.statusText.textContent = 'No server configured — click to set up';
+    serverConnected = false;
+    updateActionButtons();
+    return;
+  }
+
+  const displayName = server.name || getHostname(server.url);
+  els.activeServerName.textContent = displayName;
+
   try {
-    const settings = await storage.getSettings();
-    if (!settings.webdav.url) {
-      setStatus(false, '');
-      serverConnected = false;
-      updateActionButtons();
-      return;
-    }
-    const password = await storage.getPassword();
-    const ok = await testConnection(settings.webdav.url, settings.webdav.username, password);
+    const ok = await testConnection(server.url, server.username, server.password);
     serverConnected = ok;
     updateActionButtons();
-    setStatus(ok, settings.webdav.url);
+    els.statusDot.className = ok ? 'dot connected' : 'dot disconnected';
+    els.statusText.textContent = ok
+      ? getHostname(server.url) + ' — Connected'
+      : displayName + ' — Disconnected';
   } catch {
     serverConnected = false;
     updateActionButtons();
-    setStatus(false, (await storage.getSettings()).webdav.url || '');
+    els.statusDot.className = 'dot disconnected';
+    els.statusText.textContent = displayName + ' — Disconnected';
   }
 }
 
 async function loadMaxSize() {
-  const settings = await storage.getSettings();
+  settings = await storage.getSettings();
   els.maxSizeDisplay.textContent = 'Max upload: ' + formatSize(settings.maxFileSize);
 }
 
 async function loadHistory() {
   const history = await storage.getHistory();
-  const settings = await storage.getSettings();
-  const capacity = settings.historyCapacity || 50;
+  const capacity = settings?.historyCapacity || 50;
   els.historyHeader.textContent = history.length ? `Recent (${history.length}/${capacity})` : 'Recent';
   els.historyList.innerHTML = '';
   for (const item of history) {
@@ -390,8 +482,8 @@ els.readBtn.addEventListener('click', async () => {
 els.uploadBtn.addEventListener('click', async () => {
   if (!clipboardContent) return;
 
-  const settings = await storage.getSettings();
-  if (!settings.webdav.url) {
+  const server = await storage.getActiveServer();
+  if (!server) {
     showBanner('Configure WebDAV server in Settings first', 'error');
     return;
   }
@@ -401,12 +493,13 @@ els.uploadBtn.addEventListener('click', async () => {
     els.uploadBtn.textContent = 'Uploading...';
 
     const content = clipboardContent;
-    const password = await storage.getPassword();
     const profile = await buildProfile(content);
     const uploadBlob = getUploadBlob(content, profile);
 
     if (uploadBlob && uploadBlob.size > settings.maxFileSize) {
       showBanner('File exceeds maximum upload size (' + formatSize(settings.maxFileSize) + ')', 'error');
+      setButtons(true);
+      els.uploadBtn.textContent = 'Upload';
       return;
     }
 
@@ -414,11 +507,10 @@ els.uploadBtn.addEventListener('click', async () => {
       if (!uploadBlob) {
         throw new Error('Missing transfer data for upload');
       }
-      const fileName = profile.dataName;
-      await putFileData(settings.webdav.url, settings.webdav.username, password, fileName, uploadBlob);
+      await putFileData(server.url, server.username, server.password, profile.dataName, uploadBlob);
     }
 
-    await putProfile(settings.webdav.url, settings.webdav.username, password, profile);
+    await putProfile(server.url, server.username, server.password, profile);
 
     await storage.addHistory({
       type: profile.type,
@@ -440,8 +532,8 @@ els.uploadBtn.addEventListener('click', async () => {
 });
 
 els.downloadBtn.addEventListener('click', async () => {
-  const settings = await storage.getSettings();
-  if (!settings.webdav.url) {
+  const server = await storage.getActiveServer();
+  if (!server) {
     showBanner('Configure WebDAV server in Settings first', 'error');
     return;
   }
@@ -450,11 +542,12 @@ els.downloadBtn.addEventListener('click', async () => {
     setButtons(false);
     els.downloadBtn.textContent = 'Downloading...';
 
-    const password = await storage.getPassword();
-    const profile = await getProfile(settings.webdav.url, settings.webdav.username, password);
+    const profile = await getProfile(server.url, server.username, server.password);
 
     if (profile.hash === '' ||  profile.size === 0) {
       setServerPreview('No clipboard on server', true);
+      setButtons(true);
+      els.downloadBtn.textContent = 'Download';
       return;
     }
     setServerPreview(formatProfileDisplay(profile));
@@ -462,7 +555,7 @@ els.downloadBtn.addEventListener('click', async () => {
     if (profile.type === 'Text') {
       let text = profile.text || '';
       if (profile.hasData) {
-        const blob = await getFileData(settings.webdav.url, settings.webdav.username, password, profile.dataName);
+        const blob = await getFileData(server.url, server.username, server.password, profile.dataName);
         text = await blob.text();
       }
 
@@ -487,7 +580,7 @@ els.downloadBtn.addEventListener('click', async () => {
       await loadHistory();
       showBanner('Copied to clipboard', 'success');
     } else {
-      const savedFileName = await downloadProfileData(settings, password, profile.dataName);
+      const savedFileName = await downloadProfileData(server, profile.dataName);
 
       await storage.addHistory({
         type: profile.type,
@@ -518,8 +611,8 @@ els.downloadBtn.addEventListener('click', async () => {
 els.previewServerBtn.addEventListener('click', async () => {
   if (els.previewServerBtn.disabled) return;
 
-  const settings = await storage.getSettings();
-  if (!settings.webdav.url) {
+  const server = await storage.getActiveServer();
+  if (!server) {
     showBanner('Configure WebDAV server in Settings first', 'error');
     return;
   }
@@ -530,17 +623,18 @@ els.previewServerBtn.addEventListener('click', async () => {
   setServerPreview('Loading server content...', true);
 
   try {
-    const password = await storage.getPassword();
     const TIMEOUT_MS = 10000;
     const timeoutError = new Error('Preview timed out');
     timeoutError.name = 'TimeoutError';
     const profile = await Promise.race([
-      getProfile(settings.webdav.url, settings.webdav.username, password),
+      getProfile(server.url, server.username, server.password),
       new Promise((_, reject) => setTimeout(() => reject(timeoutError), TIMEOUT_MS))
     ]);
 
     if (profile.hash === '' ||  profile.size === 0) {
       setServerPreview('No clipboard on server', true);
+      setButtons(true);
+      els.previewServerBtn.textContent = 'Preview';
       return;
     }
 
@@ -576,11 +670,20 @@ els.confirmDialog.addEventListener('click', (e) => {
   if (e.target === els.confirmDialog) els.confirmDialog.style.display = 'none';
 });
 
-els.statusBar.addEventListener('click', () => {
+els.statusInfo.addEventListener('click', () => {
   window.open('options.html', '_blank');
 });
 
 async function init() {
+  await storage.runMigration();
+  settings = await storage.getSettings();
+
+  if (settings.servers.length > 1) {
+    els.serverSelector.hidden = false;
+  } else if (settings.servers.length === 1) {
+    els.serverSelector.hidden = true;
+  }
+
   await loadMaxSize();
   await loadHistory();
   await checkConnection();

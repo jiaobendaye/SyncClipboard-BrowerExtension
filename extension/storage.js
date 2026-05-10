@@ -41,23 +41,34 @@ function deobfuscate(encoded) {
  */
 
 /**
- * @typedef {Object} WebdavSettings
+ * @typedef {Object} ServerConfig
+ * @property {string} id
+ * @property {string} name
  * @property {string} url
  * @property {string} username
+ * @property {string} password - XOR-obfuscated
  */
 
 /**
  * @typedef {Object} Settings
- * @property {WebdavSettings} webdav
+ * @property {ServerConfig[]} servers
+ * @property {string} activeServerId
  * @property {number} maxFileSize
+ * @property {number} historyCapacity
+ * @property {number} [migrationVersion]
  */
 
 /**
  * @typedef {Object} StorageProvider
  * @property {function(): Promise<Settings>} getSettings
  * @property {function(Settings): Promise<void>} setSettings
- * @property {function(): Promise<string|null>} getPassword
- * @property {function(string): Promise<void>} setPassword
+ * @property {function(string): Promise<string>} getServerPassword
+ * @property {function(string, string): Promise<void>} setServerPassword
+ * @property {function(): Promise<ServerConfig>} getActiveServer
+ * @property {function(string): Promise<void>} setActiveServer
+ * @property {function(Omit<ServerConfig, 'id'>): Promise<ServerConfig>} addServer
+ * @property {function(string, Partial<Omit<ServerConfig, 'id'>>): Promise<ServerConfig>} updateServer
+ * @property {function(string): Promise<void>} deleteServer
  * @property {function(): Promise<HistoryItem[]>} getHistory
  * @property {function(HistoryItem): Promise<void>} addHistory
  * @property {function(): Promise<void>} clearHistory
@@ -70,7 +81,8 @@ function makeId() {
 
 function defaultSettings() {
   return {
-    webdav: { url: '', username: '' },
+    servers: [],
+    activeServerId: '',
     maxFileSize: DEFAULT_MAX_FILE_SIZE,
     historyCapacity: DEFAULT_HISTORY_CAPACITY
   };
@@ -79,29 +91,128 @@ function defaultSettings() {
 /**
  * Chrome storage implementation.
  * Settings → chrome.storage.local
- * Password → chrome.storage.local (XOR-obfuscated)
+ * Password → stored XOR-obfuscated within each server object
  * History → chrome.storage.local
  * @returns {StorageProvider}
  */
 export function createChromeStorage() {
+  async function getRawSettings() {
+    const result = await browserApi.storage.local.get(['settings']);
+    return result.settings || defaultSettings();
+  }
+
   return {
     async getSettings() {
-      const result = await browserApi.storage.local.get(['settings']);
-      return result.settings || defaultSettings();
+      return getRawSettings();
     },
 
     async setSettings(settings) {
       await browserApi.storage.local.set({ settings });
     },
 
-    async getPassword() {
-      const result = await browserApi.storage.local.get(['password']);
-      const password = result.password || null;
-      return password ? deobfuscate(password) : null;
+    async runMigration() {
+      const settings = await getRawSettings();
+      if (settings.migrationVersion !== undefined) return;
+      if (settings.servers !== undefined) {
+        await this.setSettings({ ...settings, migrationVersion: 1 });
+        return;
+      }
+      const result = await browserApi.storage.local.get(['webdav', 'password']);
+      const { webdav, password } = result;
+      if (!webdav?.url) return;
+      const hostname = new URL(webdav.url).hostname;
+      const migrated = {
+        servers: [{
+          id: 'default',
+          name: hostname,
+          url: webdav.url,
+          username: webdav.username || '',
+          password: password || ''
+        }],
+        activeServerId: 'default',
+        maxFileSize: settings.maxFileSize ?? DEFAULT_MAX_FILE_SIZE,
+        historyCapacity: settings.historyCapacity ?? DEFAULT_HISTORY_CAPACITY,
+        migrationVersion: 1
+      };
+      await this.setSettings(migrated);
+      await browserApi.storage.local.remove(['webdav', 'password']);
     },
 
-    async setPassword(password) {
-      await browserApi.storage.local.set({ password: obfuscate(password) });
+    async getServerPassword(serverId) {
+      const settings = await this.getSettings();
+      const server = settings.servers?.find(s => s.id === serverId);
+      return server?.password ? deobfuscate(server.password) : '';
+    },
+
+    async setServerPassword(serverId, password) {
+      const settings = await this.getSettings();
+      const servers = settings.servers.map(s =>
+        s.id === serverId ? { ...s, password: obfuscate(password) } : s
+      );
+      await this.setSettings({ ...settings, servers });
+    },
+
+    async getActiveServer() {
+      const settings = await this.getSettings();
+      let server = settings.servers?.find(s => s.id === settings.activeServerId);
+      if (!server && settings.servers?.length > 0) {
+        server = settings.servers[0];
+        await this.setSettings({ ...settings, activeServerId: server.id });
+      }
+      if (!server) return null;
+      return {
+        ...server,
+        password: server.password ? deobfuscate(server.password) : ''
+      };
+    },
+
+    async setActiveServer(id) {
+      const settings = await this.getSettings();
+      await this.setSettings({ ...settings, activeServerId: id });
+    },
+
+    async addServer(server) {
+      const settings = await this.getSettings();
+      const id = crypto.randomUUID();
+      const newServer = {
+        ...server,
+        id,
+        password: server.password ? obfuscate(server.password) : ''
+      };
+      const servers = [...(settings.servers || []), newServer];
+      const updates = { servers };
+      if (!settings.activeServerId) {
+        updates.activeServerId = id;
+      }
+      await this.setSettings({ ...settings, ...updates });
+      return { ...newServer, password: server.password || '' };
+    },
+
+    async updateServer(id, fields) {
+      const settings = await this.getSettings();
+      const servers = settings.servers.map(s => {
+        if (s.id !== id) return s;
+        const updated = { ...s, ...fields };
+        if (fields.password !== undefined) {
+          updated.password = obfuscate(fields.password);
+        }
+        return updated;
+      });
+      await this.setSettings({ ...settings, servers });
+      const server = servers.find(s => s.id === id);
+      return server ? { ...server, password: fields.password ?? (server.password ? deobfuscate(server.password) : '') } : null;
+    },
+
+    async deleteServer(id) {
+      const settings = await this.getSettings();
+      let { activeServerId } = settings;
+      const servers = settings.servers.filter(s => s.id !== id);
+      if (id === activeServerId && servers.length > 0) {
+        activeServerId = servers[0].id;
+      } else if (id === activeServerId) {
+        activeServerId = '';
+      }
+      await this.setSettings({ ...settings, servers, activeServerId });
     },
 
     async getHistory() {
