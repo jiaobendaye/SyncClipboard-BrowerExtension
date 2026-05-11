@@ -417,7 +417,7 @@ function escapeHtml(str) {
 
 async function reDownload(item) {
   if (item.type === 'Text' && !item.fileName) {
-    setPreviewText(item.text);
+    setPreviewText(getTextPreview(item.text));
     clipboardContent = { type: 'Text', text: item.text, blob: null };
     updateActionButtons();
   }
@@ -521,6 +521,7 @@ els.uploadBtn.addEventListener('click', async () => {
       direction: 'up'
     });
 
+    setServerPreview(formatProfileDisplay(profile))
     showBanner('Uploaded successfully', 'success');
     await loadHistory();
   } catch (err) {

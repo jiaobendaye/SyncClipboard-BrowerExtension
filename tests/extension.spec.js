@@ -76,11 +76,23 @@ async function seedSettings(page, overrides = {}) {
   }, { url, username, password, maxFileSize, historyCapacity });
 }
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page, browserName }) => {
   page.setDefaultTimeout(1000);
   await page.addInitScript(() => {
     window.__SYNC_STORAGE_PATH__ = 'syncclipboard-test';
   });
+  // In Playwright Firefox, page.route() does not intercept XHR requests that
+  // pass credentials via xhr.open(method, url, true, user, pass). Strip them
+  // so mocked routes work properly. Credentials are unnecessary in tests
+  // because page.route() fulfills requests before they reach the network.
+  if (browserName === 'firefox') {
+    await page.addInitScript(() => {
+      const origOpen = XMLHttpRequest.prototype.open;
+      XMLHttpRequest.prototype.open = function (method, url, async, _user, _password) {
+        return origOpen.call(this, method, url, async);
+      };
+    });
+  }
 });
 
 test.describe('Options Page', () => {
