@@ -180,6 +180,13 @@ section {
   background: #f8faff;
 }
 
+#server-preview-text {
+  font-size: 13px;
+  color: #333;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
 #server-preview .placeholder {
   color: #93a3c0;
 }
