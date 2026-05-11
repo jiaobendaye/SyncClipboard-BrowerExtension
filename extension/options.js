@@ -209,7 +209,10 @@ els.testBtn.addEventListener('click', async () => {
   try {
     const url = els.serverUrlInput.value;
     const username = els.serverUsernameInput.value;
-    const password = els.serverPasswordInput.value;
+    let password = els.serverPasswordInput.value;
+    if (!password && editingServerId) {
+      password = await storage.getServerPassword(editingServerId);
+    }
     const ok = await testConnection(url, username, password);
     els.testResult.textContent = ok ? 'Connected' : 'Failed';
     els.testResult.className = ok ? 'test-result ok' : 'test-result fail';
