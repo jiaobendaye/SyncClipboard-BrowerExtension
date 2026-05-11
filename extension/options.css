@@ -316,13 +316,6 @@ section {
 .test-result.ok { color: #16a34a; }
 .test-result.fail { color: #dc2626; }
 
-.delete-error {
-  font-size: 12px;
-  color: #dc2626;
-  font-weight: 600;
-  margin: 6px 0;
-}
-
 .form-actions {
   display: flex;
   gap: 8px;
