@@ -27,6 +27,7 @@ const els = {
   historyCapacityError: document.getElementById('history-capacity-error'),
   saveSettingsBtn: document.getElementById('save-settings-btn'),
   saveResult: document.getElementById('save-result'),
+  activateFeedback: document.getElementById('activate-feedback'),
   deleteConfirmDialog: document.getElementById('delete-confirm-dialog'),
   deleteConfirmMessage: document.getElementById('delete-confirm-message'),
   deleteConfirmYes: document.getElementById('delete-confirm-yes'),
@@ -80,9 +81,19 @@ function renderServerCard(server) {
     await storage.setActiveServer(server.id);
     settings = await storage.getSettings();
     renderServerList();
+    showSectionFeedback('✓ ' + (server.name || getHostname(server.url)));
   });
 
   return card;
+}
+
+function showSectionFeedback(msg, isError = false) {
+  els.activateFeedback.textContent = msg;
+  els.activateFeedback.className = 'activate-feedback' + (isError ? ' error' : '');
+  clearTimeout(els.activateFeedback._timeout);
+  els.activateFeedback._timeout = setTimeout(() => {
+    els.activateFeedback.classList.add('fade');
+  }, 3000);
 }
 
 function renderServerList() {
@@ -95,6 +106,7 @@ function renderServerList() {
 function showEditForm(serverId = null) {
   editingServerId = serverId;
   els.editForm.hidden = false;
+  els.testResult.textContent = '';
 
   if (serverId) {
     const server = settings.servers.find(s => s.id === serverId);
@@ -129,8 +141,7 @@ async function handleDelete(serverId) {
   const isLast = settings.servers.length === 1;
 
   if (isActive && !isLast) {
-    els.testResult.textContent = 'Switch to another server first';
-    els.testResult.className = 'test-result fail';
+    showSectionFeedback('Switch to another server first', true);
     return;
   }
 
@@ -146,8 +157,7 @@ async function handleDelete(serverId) {
     settings = await storage.getSettings();
     hideEditForm();
   } catch (err) {
-    els.testResult.textContent = 'Delete failed: ' + err.message;
-    els.testResult.className = 'test-result fail';
+    showSectionFeedback('Delete failed: ' + err.message, true);
   }
 }
 

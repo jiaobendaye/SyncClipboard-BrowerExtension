@@ -822,8 +822,8 @@ test.describe('Options Page - Multi-Server', () => {
 
     // First card is active — click delete
     await page.locator('.server-card').first().locator('.delete-btn').click({ force: true });
-    await expect(page.locator('#test-result')).toHaveClass(/fail/);
-    await expect(page.locator('#test-result')).toContainText('Switch to another server first');
+    await expect(page.locator('#activate-feedback')).toHaveClass(/error/);
+    await expect(page.locator('#activate-feedback')).toContainText('Switch to another server first');
   });
 
   test('Delete last server — confirm removes server', async ({ page }) => {
