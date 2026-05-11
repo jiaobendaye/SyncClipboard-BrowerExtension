@@ -309,20 +309,35 @@ async function loadHistory() {
   for (const item of history) {
     const li = document.createElement('li');
     li.className = 'history-item';
-    const icon = item.type === 'Text' ? '&#x1F4CB;' : item.type === 'Image' ? '&#x1F5BC;' : '&#x1F4C4;';
-    const directionIcon = item.direction === 'up' ? '&#x2191;' : '&#x2193;';
-    li.innerHTML = `<span class="direction-icon">${directionIcon}</span><span class="type-icon">${icon}</span><span class="item-text">${escapeHtml(item.text)}</span><span class="item-time">${formatTime(item.timestamp)}</span>`;
+    const icon = item.type === 'Text' ? '📋' : item.type === 'Image' ? '🖼' : '📄';
+    const directionIcon = item.direction === 'up' ? '↑' : '↓';
+
+    const dirSpan = document.createElement('span');
+    dirSpan.className = 'direction-icon';
+    dirSpan.textContent = directionIcon;
+    li.appendChild(dirSpan);
+
+    const typeSpan = document.createElement('span');
+    typeSpan.className = 'type-icon';
+    typeSpan.textContent = icon;
+    li.appendChild(typeSpan);
+
+    const textSpan = document.createElement('span');
+    textSpan.className = 'item-text';
+    textSpan.textContent = item.text;
+    li.appendChild(textSpan);
+
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'item-time';
+    timeSpan.textContent = formatTime(item.timestamp);
+    li.appendChild(timeSpan);
+
     li.addEventListener('click', () => reDownload(item));
     els.historyList.appendChild(li);
   }
   els.clearHistoryBtn.disabled = history.length === 0;
 }
 
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
 
 async function reDownload(item) {
   if (item.type === 'Text' && !item.fileName) {

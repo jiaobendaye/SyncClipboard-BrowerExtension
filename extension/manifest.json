@@ -6,8 +6,11 @@
   "minimum_chrome_version": "102",
   "browser_specific_settings": {
     "gecko": {
-      "id": "syncclipboard@example.com",
-      "strict_min_version": "115.0"
+      "id": "carn.domai.81927@gmail.com",
+      "data_collection_permissions": {
+        "required": [ "none" ]
+      },
+      "strict_min_version": "142.0"
     }
   },
   "permissions": [

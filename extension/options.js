@@ -54,27 +54,58 @@ function renderServerCard(server) {
   card.setAttribute('role', 'listitem');
   card.dataset.serverId = server.id;
 
-  card.innerHTML = `
-    <div class="server-info">
-      <div class="server-name">${escapeHtml(server.name || getHostname(server.url))}</div>
-      <div class="server-url">${escapeHtml(server.url)}</div>
-    </div>
-    ${isActive ? '<span class="active-badge">Active</span>' : ''}
-    <div class="server-actions">
-      <button class="icon-btn edit-btn" title="Edit" aria-label="Edit ${escapeHtml(server.name)}">&#9998;</button>
-      <button class="icon-btn delete-btn" title="Delete" aria-label="Delete ${escapeHtml(server.name)}">&#128465;</button>
-    </div>
-  `;
 
-  card.querySelector('.edit-btn').addEventListener('click', (e) => {
+  // Server info
+  const info = document.createElement('div');
+  info.className = 'server-info';
+
+  const nameEl = document.createElement('div');
+  nameEl.className = 'server-name';
+  nameEl.textContent = server.name || getHostname(server.url);
+  info.appendChild(nameEl);
+
+  const urlEl = document.createElement('div');
+  urlEl.className = 'server-url';
+  urlEl.textContent = server.url;
+  info.appendChild(urlEl);
+
+  card.appendChild(info);
+
+  // Active badge
+  if (isActive) {
+    const badge = document.createElement('span');
+    badge.className = 'active-badge';
+    badge.textContent = 'Active';
+    card.appendChild(badge);
+  }
+
+  // Action buttons
+  const actions = document.createElement('div');
+  actions.className = 'server-actions';
+
+  const editBtn = document.createElement('button');
+  editBtn.className = 'icon-btn edit-btn';
+  editBtn.title = 'Edit';
+  editBtn.setAttribute('aria-label', `Edit ${server.name}`);
+  editBtn.textContent = '✎';
+  editBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     showEditForm(server.id);
   });
+  actions.appendChild(editBtn);
 
-  card.querySelector('.delete-btn').addEventListener('click', (e) => {
+  const deleteBtn = document.createElement('button');
+  deleteBtn.className = 'icon-btn delete-btn';
+  deleteBtn.title = 'Delete';
+  deleteBtn.setAttribute('aria-label', `Delete ${server.name}`);
+  deleteBtn.textContent = '🗑';
+  deleteBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     handleDelete(server.id);
   });
+  actions.appendChild(deleteBtn);
+
+  card.appendChild(actions);
 
   card.addEventListener('click', async () => {
     if (server.id === settings.activeServerId) return;
@@ -347,11 +378,6 @@ els.saveSettingsBtn.addEventListener('click', async () => {
   }
 });
 
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
 
 async function loadSettings() {
   await storage.runMigration();
