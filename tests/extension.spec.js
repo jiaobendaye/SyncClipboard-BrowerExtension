@@ -97,7 +97,6 @@ test.beforeEach(async ({ page, browserName }) => {
 
 test.describe('Options Page', () => {
   test('1. Connection test success', async ({ page, browserName }) => {
-    test.skip(browserName === 'firefox', 'XHR with credentials in xhr.open() behaves differently in Firefox Playwright');
     await page.goto(OPTIONS);
     await mockWebdav(page, [PROPFIND_OK]);
 
@@ -647,7 +646,6 @@ test.describe('Popup', () => {
   });
 
   test('Preview and Download enabled when server connected', async ({ page, browserName }) => {
-    test.skip(browserName === 'firefox', 'XHR with credentials in xhr.open() behaves differently in Firefox Playwright');
     await page.goto(POPUP);
     await mockWebdav(page, [PROPFIND_OK]);
     await seedSettings(page);
@@ -671,7 +669,6 @@ test.describe('Popup', () => {
   });
 
   test('Upload enabled after reading clipboard with server connected', async ({ page, context, browserName }) => {
-    test.skip(browserName === 'firefox', 'XHR with credentials in xhr.open() behaves differently in Firefox Playwright');
     await grantClipboard(context);
     await page.goto(POPUP);
     await mockWebdav(page, [PROPFIND_OK]);
@@ -722,7 +719,6 @@ test.describe('Popup', () => {
 
 test.describe('Options Page - Multi-Server', () => {
   test('Add server — form closes and card appears', async ({ page, browserName }) => {
-    test.skip(browserName === 'firefox');
     await page.goto(OPTIONS);
     await mockWebdav(page, [PROPFIND_OK]);
 
@@ -741,7 +737,6 @@ test.describe('Options Page - Multi-Server', () => {
   });
 
   test('Edit server — modifies name and saves in-place', async ({ page, browserName }) => {
-    test.skip(browserName === 'firefox');
     await page.goto(OPTIONS);
     await mockWebdav(page, [PROPFIND_OK]);
 
@@ -763,7 +758,6 @@ test.describe('Options Page - Multi-Server', () => {
   });
 
   test('Delete server — removes card from list', async ({ page, browserName }) => {
-    test.skip(browserName === 'firefox');
     await page.goto(OPTIONS);
     await mockWebdav(page, [PROPFIND_OK]);
 
@@ -803,7 +797,6 @@ test.describe('Options Page - Multi-Server', () => {
   });
 
   test('Delete active server blocked when other servers exist', async ({ page, browserName }) => {
-    test.skip(browserName === 'firefox');
     await page.goto(OPTIONS);
     await mockWebdav(page, [PROPFIND_OK]);
 
