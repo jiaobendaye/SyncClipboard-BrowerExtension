@@ -8,10 +8,6 @@ const storage = browserApi.available
   : createMockStorage(typeof window !== 'undefined' ? window.__SYNC_STORAGE_PATH__ : undefined);
 
 const els = {
-  serverSelector: document.getElementById('server-selector'),
-  serverSelectorBtn: document.getElementById('server-selector-btn'),
-  activeServerName: document.getElementById('active-server-name'),
-  serverDropdown: document.getElementById('server-dropdown'),
   statusInfo: document.getElementById('status-info'),
   statusDot: document.getElementById('status-dot'),
   statusText: document.getElementById('status-text'),
@@ -272,95 +268,9 @@ function updateActionButtons() {
   els.previewServerBtn.disabled = !serverConnected;
 }
 
-function renderDropdown() {
-  els.serverDropdown.innerHTML = '';
-
-  for (const server of settings.servers) {
-    const item = document.createElement('div');
-    item.className = 'dd-item' + (server.id === settings.activeServerId ? ' active' : '');
-    item.setAttribute('role', 'option');
-    item.setAttribute('aria-selected', server.id === settings.activeServerId ? 'true' : 'false');
-    item.dataset.serverId = server.id;
-    const displayName = server.name || getHostname(server.url);
-    const hostname = getHostname(server.url);
-    item.innerHTML = `
-      <span class="dd-server-icon">&#127760;</span>
-      <span class="dd-server-name">${escapeHtml(displayName)}</span>
-      <span class="dd-server-host">${escapeHtml(hostname)}</span>
-      ${server.id === settings.activeServerId ? '<span class="check">✓</span>' : ''}
-    `;
-    item.addEventListener('click', () => selectServer(server.id));
-    els.serverDropdown.appendChild(item);
-  }
-
-  const divider = document.createElement('div');
-  divider.className = 'dd-divider';
-  els.serverDropdown.appendChild(divider);
-
-  const addItem = document.createElement('div');
-  addItem.className = 'dd-item add-item';
-  addItem.setAttribute('role', 'option');
-  addItem.innerHTML = '<span>+</span><span>Add New Server...</span>';
-  addItem.addEventListener('click', () => {
-    closeDropdown();
-    window.open('options.html#servers', '_blank');
-  });
-  els.serverDropdown.appendChild(addItem);
-}
-
-function openDropdown() {
-  renderDropdown();
-  els.serverDropdown.classList.add('open');
-  els.serverSelectorBtn.setAttribute('aria-expanded', 'true');
-}
-
-function closeDropdown() {
-  els.serverDropdown.classList.remove('open');
-  els.serverSelectorBtn.setAttribute('aria-expanded', 'false');
-}
-
-function toggleDropdown(e) {
-  e.stopPropagation();
-  if (els.serverDropdown.classList.contains('open')) {
-    closeDropdown();
-  } else {
-    openDropdown();
-  }
-}
-
-els.serverSelectorBtn.addEventListener('click', toggleDropdown);
-
-document.addEventListener('click', (e) => {
-  if (!els.serverSelector.contains(e.target)) closeDropdown();
-});
-
-els.serverSelectorBtn.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') closeDropdown();
-});
-
-async function selectServer(serverId) {
-  closeDropdown();
-  if (serverId === settings.activeServerId) return;
-
-  await storage.setActiveServer(serverId);
-  settings = await storage.getSettings();
-
-  const server = settings.servers.find(s => s.id === serverId);
-  const displayName = server?.name || getHostname(server?.url);
-  els.activeServerName.textContent = displayName;
-
-  els.statusDot.className = 'dot checking';
-  els.statusText.textContent = 'Switching to ' + displayName + '...';
-  serverConnected = false;
-  updateActionButtons();
-
-  await checkConnection();
-}
-
 async function checkConnection() {
   const server = await storage.getActiveServer();
   if (!server) {
-    els.serverSelector.hidden = true;
     els.statusDot.className = 'dot disconnected';
     els.statusText.textContent = 'No server configured — click to set up';
     serverConnected = false;
@@ -369,7 +279,6 @@ async function checkConnection() {
   }
 
   const displayName = server.name || getHostname(server.url);
-  els.activeServerName.textContent = displayName;
 
   try {
     const ok = await testConnection(server.url, server.username, server.password);
@@ -678,12 +587,6 @@ els.statusInfo.addEventListener('click', () => {
 async function init() {
   await storage.runMigration();
   settings = await storage.getSettings();
-
-  if (settings.servers.length > 1) {
-    els.serverSelector.hidden = false;
-  } else if (settings.servers.length === 1) {
-    els.serverSelector.hidden = true;
-  }
 
   await loadMaxSize();
   await loadHistory();

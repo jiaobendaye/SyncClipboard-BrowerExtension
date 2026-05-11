@@ -356,3 +356,34 @@ section {
 
 .save-success { color: #16a34a; font-size: 13px; font-weight: 500; }
 .save-error { color: #dc2626; font-size: 13px; font-weight: 500; }
+
+/* Confirm dialog */
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.dialog-box {
+  background: #fff;
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  text-align: center;
+  min-width: 220px;
+}
+
+.dialog-box .dialog-message {
+  font-size: 14px;
+  margin-bottom: 14px;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}

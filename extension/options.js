@@ -26,7 +26,11 @@ const els = {
   historyCapacityInput: document.getElementById('history-capacity-input'),
   historyCapacityError: document.getElementById('history-capacity-error'),
   saveSettingsBtn: document.getElementById('save-settings-btn'),
-  saveResult: document.getElementById('save-result')
+  saveResult: document.getElementById('save-result'),
+  deleteConfirmDialog: document.getElementById('delete-confirm-dialog'),
+  deleteConfirmMessage: document.getElementById('delete-confirm-message'),
+  deleteConfirmYes: document.getElementById('delete-confirm-yes'),
+  deleteConfirmNo: document.getElementById('delete-confirm-no')
 };
 
 let editingServerId = null;
@@ -43,7 +47,6 @@ function getHostname(url) {
 function renderServerCard(server) {
   const isActive = server.id === settings.activeServerId;
   const isEditing = server.id === editingServerId;
-  const canDelete = settings.servers.length > 1;
 
   const card = document.createElement('div');
   card.className = 'server-card' + (isActive ? ' active-server' : '');
@@ -58,7 +61,7 @@ function renderServerCard(server) {
     ${isActive ? '<span class="active-badge">Active</span>' : ''}
     <div class="server-actions">
       <button class="icon-btn edit-btn" title="Edit" aria-label="Edit ${escapeHtml(server.name)}">&#9998;</button>
-      ${canDelete ? `<button class="icon-btn delete-btn" title="Delete" aria-label="Delete ${escapeHtml(server.name)}">&#128465;</button>` : ''}
+      <button class="icon-btn delete-btn" title="Delete" aria-label="Delete ${escapeHtml(server.name)}">&#128465;</button>
     </div>
   `;
 
@@ -67,13 +70,17 @@ function renderServerCard(server) {
     showEditForm(server.id);
   });
 
-  const deleteBtn = card.querySelector('.delete-btn');
-  if (deleteBtn) {
-    deleteBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      handleDelete(server.id);
-    });
-  }
+  card.querySelector('.delete-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    handleDelete(server.id);
+  });
+
+  card.addEventListener('click', async () => {
+    if (server.id === settings.activeServerId) return;
+    await storage.setActiveServer(server.id);
+    settings = await storage.getSettings();
+    renderServerList();
+  });
 
   return card;
 }
@@ -120,13 +127,18 @@ async function handleDelete(serverId) {
 
   const isActive = serverId === settings.activeServerId;
   const isLast = settings.servers.length === 1;
-  const isActiveWithTwo = isActive && settings.servers.length === 2;
 
-  if (isLast) return;
-  if (isActiveWithTwo) {
+  if (isActive && !isLast) {
     els.testResult.textContent = 'Switch to another server first';
     els.testResult.className = 'test-result fail';
     return;
+  }
+
+  if (isActive && isLast) {
+    const confirmed = await showConfirmDialog(
+      'Delete the last server? You will need to add a new server to use SyncClipboard.'
+    );
+    if (!confirmed) return;
   }
 
   try {
@@ -137,6 +149,37 @@ async function handleDelete(serverId) {
     els.testResult.textContent = 'Delete failed: ' + err.message;
     els.testResult.className = 'test-result fail';
   }
+}
+
+function showConfirmDialog(message) {
+  return new Promise((resolve) => {
+    if (els.deleteConfirmDialog.style.display === 'flex') {
+      resolve(false);
+      return;
+    }
+
+    els.deleteConfirmMessage.textContent = message;
+    els.deleteConfirmDialog.style.display = 'flex';
+
+    function cleanup() {
+      els.deleteConfirmDialog.style.display = 'none';
+      els.deleteConfirmYes.removeEventListener('click', onYes);
+      els.deleteConfirmNo.removeEventListener('click', onNo);
+    }
+
+    function onYes() {
+      cleanup();
+      resolve(true);
+    }
+
+    function onNo() {
+      cleanup();
+      resolve(false);
+    }
+
+    els.deleteConfirmYes.addEventListener('click', onYes);
+    els.deleteConfirmNo.addEventListener('click', onNo);
+  });
 }
 
 els.addServerBtn.addEventListener('click', () => showEditForm(null));

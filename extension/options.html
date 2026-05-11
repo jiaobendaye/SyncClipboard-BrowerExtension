@@ -68,6 +68,16 @@
     <button id="save-settings-btn" class="btn primary">Save Settings</button>
     <span id="save-result" aria-live="polite"></span>
   </div>
+
+  <div id="delete-confirm-dialog" class="dialog-overlay" style="display:none">
+    <div class="dialog-box">
+      <p class="dialog-message" id="delete-confirm-message"></p>
+      <div class="dialog-actions">
+        <button id="delete-confirm-yes" class="btn danger">Delete</button>
+        <button id="delete-confirm-no" class="btn secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script type="module" src="options.js"></script>

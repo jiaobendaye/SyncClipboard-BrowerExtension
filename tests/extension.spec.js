@@ -789,7 +789,7 @@ test.describe('Options Page - Multi-Server', () => {
     await expect(page.locator('.server-card')).toHaveCount(1);
   });
 
-  test('Delete button hidden when only one server exists', async ({ page }) => {
+  test('Delete button visible when only one server exists', async ({ page }) => {
     await page.goto(OPTIONS);
     await mockWebdav(page, [PROPFIND_OK]);
 
@@ -799,10 +799,10 @@ test.describe('Options Page - Multi-Server', () => {
     await page.fill('#server-password-input', 'testpass');
     await page.click('#save-server-btn', { force: true });
 
-    await expect(page.locator('.delete-btn')).toHaveCount(0);
+    await expect(page.locator('.delete-btn')).toBeVisible();
   });
 
-  test('Delete button shows inline error when active and only 2 servers', async ({ page, browserName }) => {
+  test('Delete active server blocked when other servers exist', async ({ page, browserName }) => {
     test.skip(browserName === 'firefox');
     await page.goto(OPTIONS);
     await mockWebdav(page, [PROPFIND_OK]);
@@ -824,17 +824,55 @@ test.describe('Options Page - Multi-Server', () => {
     await page.locator('.server-card').first().locator('.delete-btn').click({ force: true });
     await expect(page.locator('#test-result')).toHaveClass(/fail/);
     await expect(page.locator('#test-result')).toContainText('Switch to another server first');
+  });
 
-    // Add a third server to make deletion allowed
+  test('Delete last server — confirm removes server', async ({ page }) => {
+    await page.goto(OPTIONS);
+    await mockWebdav(page, [PROPFIND_OK]);
+
     await page.click('#add-server-btn');
-    await page.fill('#server-url-input', 'https://third.example.com/');
-    await page.fill('#server-username-input', 'user3');
-    await page.fill('#server-password-input', 'pass3');
+    await page.fill('#server-url-input', WEBDAV_HOST);
+    await page.fill('#server-username-input', 'testuser');
+    await page.fill('#server-password-input', 'testpass');
     await page.click('#save-server-btn', { force: true });
 
-    // Now delete the (original) active server
-    await page.locator('.server-card').first().locator('.delete-btn').click({ force: true });
-    await expect(page.locator('.server-card')).toHaveCount(2);
+    await expect(page.locator('.server-card')).toHaveCount(1);
+
+    // Click delete on the last server
+    await page.locator('.delete-btn').click({ force: true });
+
+    // Confirm dialog should be visible
+    await expect(page.locator('#delete-confirm-dialog')).toBeVisible();
+    await expect(page.locator('#delete-confirm-message')).toContainText('Delete the last server');
+
+    // Confirm deletion
+    await page.click('#delete-confirm-yes', { force: true });
+
+    await expect(page.locator('.server-card')).toHaveCount(0);
+    await expect(page.locator('#delete-confirm-dialog')).not.toBeVisible();
+  });
+
+  test('Delete last server — cancel keeps server', async ({ page }) => {
+    await page.goto(OPTIONS);
+    await mockWebdav(page, [PROPFIND_OK]);
+
+    await page.click('#add-server-btn');
+    await page.fill('#server-url-input', WEBDAV_HOST);
+    await page.fill('#server-username-input', 'testuser');
+    await page.fill('#server-password-input', 'testpass');
+    await page.click('#save-server-btn', { force: true });
+
+    // Click delete on the last server
+    await page.locator('.delete-btn').click({ force: true });
+
+    // Confirm dialog should be visible
+    await expect(page.locator('#delete-confirm-dialog')).toBeVisible();
+
+    // Cancel deletion
+    await page.click('#delete-confirm-no', { force: true });
+
+    await expect(page.locator('.server-card')).toHaveCount(1);
+    await expect(page.locator('#delete-confirm-dialog')).not.toBeVisible();
   });
 
   test('Save Settings updates limits', async ({ page }) => {
@@ -860,158 +898,3 @@ test.describe('Options Page - Multi-Server', () => {
   });
 });
 
-test.describe('Popup - Multi-Server', () => {
-  test('Server selector hidden when only one server', async ({ page }) => {
-    await page.goto(POPUP);
-    await seedSettings(page, { url: WEBDAV_HOST });
-    await page.reload();
-    await mockWebdav(page, [PROPFIND_OK]);
-
-    await expect(page.locator('#server-selector')).toBeHidden();
-  });
-
-  test('Server selector shown when two or more servers', async ({ page }) => {
-    await page.goto(POPUP);
-    await page.evaluate(() => {
-      const data = {
-        settings: {
-          servers: [
-            { id: 's1', name: 'Server One', url: 'https://server1.example.com/', username: 'u1', password: '' },
-            { id: 's2', name: 'Server Two', url: 'https://server2.example.com/', username: 'u2', password: '' }
-          ],
-          activeServerId: 's1',
-          maxFileSize: 50 * 1024 * 1024,
-          historyCapacity: 50,
-          migrationVersion: 1
-        },
-        history: []
-      };
-      localStorage.setItem(window.__SYNC_STORAGE_PATH__, JSON.stringify(data));
-    });
-    await page.reload();
-    await mockWebdav(page, [PROPFIND_OK]);
-
-    await expect(page.locator('#server-selector')).toBeVisible();
-    await expect(page.locator('.ss-name')).toHaveText('Server One');
-  });
-
-  test('Dropdown shows all servers and Add New Server item', async ({ page }) => {
-    await page.goto(POPUP);
-    await page.evaluate(() => {
-      const data = {
-        settings: {
-          servers: [
-            { id: 's1', name: 'Work NAS', url: 'https://nas.example.com/', username: 'u1', password: '' },
-            { id: 's2', name: 'Home Server', url: 'https://home.example.com/', username: 'u2', password: '' }
-          ],
-          activeServerId: 's1',
-          maxFileSize: 50 * 1024 * 1024,
-          historyCapacity: 50,
-          migrationVersion: 1
-        },
-        history: []
-      };
-      localStorage.setItem(window.__SYNC_STORAGE_PATH__, JSON.stringify(data));
-    });
-    await page.reload();
-    await mockWebdav(page, [PROPFIND_OK]);
-
-    await page.click('#server-selector-btn');
-
-    await expect(page.locator('.dd-item')).toHaveCount(3); // 2 servers + Add New Server
-    await expect(page.locator('.dd-item.add-item')).toContainText('Add New Server');
-    await expect(page.locator('.dd-item.active .dd-server-name')).toHaveText('Work NAS');
-  });
-
-  test('Clicking Add New Server opens options page', async ({ page }) => {
-    await page.goto(POPUP);
-    await page.evaluate(() => {
-      const data = {
-        settings: {
-          servers: [
-            { id: 's1', name: 'Work NAS', url: 'https://nas.example.com/', username: 'u1', password: '' },
-            { id: 's2', name: 'Home NAS', url: 'https://home.example.com/', username: 'u2', password: '' }
-          ],
-          activeServerId: 's1',
-          maxFileSize: 50 * 1024 * 1024,
-          historyCapacity: 50,
-          migrationVersion: 1
-        },
-        history: []
-      };
-      localStorage.setItem(window.__SYNC_STORAGE_PATH__, JSON.stringify(data));
-    });
-    await page.reload();
-
-    await page.click('#server-selector-btn');
-    await page.click('.dd-item.add-item');
-
-    const newPage = await page.context().waitForEvent('page', { timeout: 5000 });
-    await expect(newPage.url()).toContain('/options.html');
-  });
-
-  test('Switching server updates status dot to checking then connected', async ({ page, browserName }) => {
-    test.skip(browserName === 'firefox');
-    await page.goto(POPUP);
-    await page.evaluate(() => {
-      const data = {
-        settings: {
-          servers: [
-            { id: 's1', name: 'Server One', url: 'https://server1.example.com/', username: 'u1', password: '' },
-            { id: 's2', name: 'Server Two', url: 'https://server2.example.com/', username: 'u2', password: '' }
-          ],
-          activeServerId: 's1',
-          maxFileSize: 50 * 1024 * 1024,
-          historyCapacity: 50,
-          migrationVersion: 1
-        },
-        history: []
-      };
-      localStorage.setItem(window.__SYNC_STORAGE_PATH__, JSON.stringify(data));
-    });
-    await page.reload();
-    await mockWebdav(page, [
-      { method: 'PROPFIND', path: '/', status: 207, contentType: 'application/xml', body: '<multistatus/>' },
-      { method: 'MKCOL', path: '/', status: 201 },
-      { method: 'MKCOL', path: '/file', status: 201 }
-    ]);
-
-    // Initially connected to s1
-    await expect(page.locator('#status-dot')).toHaveClass(/connected/);
-
-    // Switch to s2
-    await page.click('#server-selector-btn');
-    await page.locator('.dd-item').nth(1).click();
-
-    // Status should update (may be checking then connected)
-    await expect(page.locator('#server-selector')).toBeVisible();
-    // The status text should reflect the new active server
-    await expect(page.locator('.ss-name')).toHaveText('Server Two');
-  });
-
-  test('Active server shows checkmark in dropdown', async ({ page }) => {
-    await page.goto(POPUP);
-    await page.evaluate(() => {
-      const data = {
-        settings: {
-          servers: [
-            { id: 's1', name: 'Active Server', url: 'https://active.example.com/', username: 'u1', password: '' },
-            { id: 's2', name: 'Other Server', url: 'https://other.example.com/', username: 'u2', password: '' }
-          ],
-          activeServerId: 's1',
-          maxFileSize: 50 * 1024 * 1024,
-          historyCapacity: 50,
-          migrationVersion: 1
-        },
-        history: []
-      };
-      localStorage.setItem(window.__SYNC_STORAGE_PATH__, JSON.stringify(data));
-    });
-    await page.reload();
-    await mockWebdav(page, [PROPFIND_OK]);
-
-    await page.click('#server-selector-btn');
-    await expect(page.locator('.dd-item.active .check')).toBeVisible();
-    await expect(page.locator('.dd-item').nth(1)).not.toHaveClass(/active/);
-  });
-});

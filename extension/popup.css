@@ -53,15 +53,21 @@ body {
   flex: 1;
 }
 
+/* Status bar */
 #status-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: #fff;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
   cursor: pointer;
 }
 
 #status-bar:hover {
   background: #f0f4ff;
 }
-
-/* Sections */
 .section-header-row {
   display: flex;
   align-items: center;
@@ -325,122 +331,7 @@ section {
   animation: fadeIn 0.2s;
 }
 
-/* Server selector */
-.server-selector {
-  position: relative;
-}
-
-.server-selector-btn {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 8px;
-  background: #f0f4ff;
-  border: 1px solid #bfdbfe;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
-  color: #2563eb;
-  max-width: 140px;
-}
-
-.server-selector-btn:hover {
-  background: #e0edff;
-  border-color: #93c5fd;
-}
-
-.server-selector-btn .ss-icon {
-  font-size: 12px;
-  flex-shrink: 0;
-}
-
-.server-selector-btn .ss-name {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-align: left;
-}
-
-.server-selector-btn .arrow {
-  font-size: 10px;
-  color: #93c5fd;
-  flex-shrink: 0;
-  margin-left: 2px;
-}
-
-.server-dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  background: #fff;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-  z-index: 100;
-  display: none;
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.server-dropdown.open { display: block; }
-
-.dd-item {
-  padding: 10px 14px;
-  cursor: pointer;
-  font-size: 13px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.dd-item:hover { background: #f5f5f5; }
-
-.dd-item.active { background: #f0f6ff; }
-
-.dd-item .dd-server-icon {
-  font-size: 12px;
-  flex-shrink: 0;
-}
-
-.dd-item .dd-server-name {
-  font-weight: 600;
-  color: #1a1a1a;
-}
-
-.dd-item .dd-server-host {
-  font-size: 11px;
-  color: #888;
-  margin-left: 2px;
-}
-
-.dd-item .check {
-  margin-left: auto;
-  color: #2563eb;
-  font-weight: 700;
-}
-
-.dd-divider {
-  height: 1px;
-  background: #eee;
-  margin: 4px 0;
-}
-
-.dd-item.add-item { color: #2563eb; font-weight: 600; }
-
 /* Status bar with server selector */
-#status-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  background: #fff;
-  border-radius: 6px;
-  border: 1px solid #e0e0e0;
-}
-
 #status-info {
   display: flex;
   align-items: center;
