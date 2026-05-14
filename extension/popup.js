@@ -286,7 +286,7 @@ async function checkConnection() {
     updateActionButtons();
     els.statusDot.className = ok ? 'dot connected' : 'dot disconnected';
     els.statusText.textContent = ok
-      ? getHostname(server.url) + ' — Connected'
+      ? displayName + ' — Connected'
       : displayName + ' — Disconnected';
   } catch {
     serverConnected = false;
