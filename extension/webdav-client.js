@@ -7,6 +7,7 @@ import { browserApi } from './browser-api.js';
 const PROFILE_PATH = '/SyncClipboard.json';
 const FILE_DIR = '/file';
 const TIMEOUT_MS = 3000;
+const FILE_TRANSFER_TIMEOUT_MS = 60000;
 const TEXT_INLINE_MAX_BYTES = 1024;
 const textEncoder = new TextEncoder();
 
@@ -34,14 +35,14 @@ function stripTrailingSlash(url) {
   return url.replace(/\/+$/, '');
 }
 
-async function request(method, baseUrl, username, password, path, body, contentType, responseType = '') {
+async function request(method, baseUrl, username, password, path, body, contentType, responseType = '', timeoutMs = TIMEOUT_MS) {
   const url = stripTrailingSlash(baseUrl) + path;
 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     // Pass credentials to open() to suppress native auth dialog on 401.
     xhr.open(method, url, true, username || '', password || '');
-    xhr.timeout = TIMEOUT_MS;
+    xhr.timeout = timeoutMs;
     if (username || password) {
       xhr.setRequestHeader('Authorization', 'Basic ' + base64Encode((username || '') + ':' + (password || '')));
     }
@@ -119,7 +120,7 @@ export async function putProfile(baseUrl, username, password, profile) {
 export async function getFileData(baseUrl, username, password, fileName) {
   // await ensureDir(baseUrl, username, password, FILE_DIR);
   const path = `${FILE_DIR}/${encodeURIComponent(fileName)}`;
-  const res = await request('GET', baseUrl, username, password, path, undefined, undefined, 'blob');
+  const res = await request('GET', baseUrl, username, password, path, undefined, undefined, 'blob', FILE_TRANSFER_TIMEOUT_MS);
   if (!res.ok) {
     throw new Error(`Failed to download file ${fileName}: HTTP ${res.status}`);
   }
@@ -133,7 +134,7 @@ export async function getFileData(baseUrl, username, password, fileName) {
 export async function putFileData(baseUrl, username, password, fileName, blob) {
   await ensureDir(baseUrl, username, password, FILE_DIR);
   const path = `${FILE_DIR}/${encodeURIComponent(fileName)}`;
-  const res = await request('PUT', baseUrl, username, password, path, blob, 'application/octet-stream');
+  const res = await request('PUT', baseUrl, username, password, path, blob, 'application/octet-stream', '', FILE_TRANSFER_TIMEOUT_MS);
   if (!res.ok) {
     throw new Error(`Failed to upload file ${fileName}: HTTP ${res.status}`);
   }
