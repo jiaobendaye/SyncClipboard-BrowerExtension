@@ -15,7 +15,7 @@ SyncClipboard 生态的浏览器扩展（Chrome / Firefox），通过 WebDAV 实
 ## 开发进度
 
 - [x] **WebDAV 服务** — 已实现，通过 WebDAV 服务器同步剪贴板
-- [ ] **官方服务** — 待开发，接入 SyncClipboard 官方服务
+- [ ] **Group 类型支持** — 待开发，上传和下载 Group 类型剪贴板内容（多条目组合）
 
 ## 项目结构  
 
