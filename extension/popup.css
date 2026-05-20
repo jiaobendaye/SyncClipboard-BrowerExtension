@@ -239,6 +239,14 @@ section {
 
 #change-link:hover { text-decoration: underline; }
 
+#github-link {
+  color: #888;
+  text-decoration: none;
+  margin-left: auto;
+}
+
+#github-link:hover { color: #333; }
+
 /* Confirm dialog */
 .dialog-overlay {
   position: fixed;
